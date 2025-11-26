@@ -22,6 +22,7 @@
         <module>vassal-app</module>
         <module>vassal-deprecation</module>
         <module>vassal-doc</module>
+        <module>vassal-tools</module>
         <module>release-prepare</module>
     </modules>
 
