@@ -44,6 +44,23 @@ public class TraitParserRegistry {
         register(new SetGlobalPropertyParser());    // setprop - Set Global Property
         register(new SendToLocationParser());       // sendto - Send to Location
         register(new ReturnToDeckParser());         // return - Return to Deck
+
+        // Register Low Priority traits (Phase 4)
+        register(new TriggerActionParser());            // macro - Trigger Action
+        register(new ActionButtonParser());             // button - Action Button
+        register(new MenuSeparatorParser());            // menuSeparator - Menu Separator
+        register(new GlobalHotKeyParser());             // globalhotkey - Global Hotkey
+        register(new SubMenuParser());                  // submenu - Sub-Menu
+        register(new DeselectParser());                 // deselect - Deselect
+        register(new NonRectangularParser());           // nonRect2 - Non-Rectangular
+        register(new FootprintParser());                // footprint - Movement Trail
+        register(new AreaOfEffectParser());             // AreaOfEffect - Area of Effect
+        register(new RestrictCommandsParser());         // hideCmd - Restrict Commands
+        register(new DynamicPropertyParser());          // PROP - Dynamic Property
+        register(new PlaySoundParser());                // playSound - Play Sound
+        register(new AttachmentParser());               // attach - Attachment
+        register(new TranslateParser());                // translate - Move Fixed Distance
+        register(new CounterGlobalKeyCommandParser());  // globalkey - Global Key Command
     }
 
     public static TraitParserRegistry getInstance() {
