@@ -57,29 +57,50 @@
                 </configuration>
             </plugin>
 
-            <!-- Create executable JAR with all dependencies -->
+            <!-- Create executable JARs with all dependencies -->
             <plugin>
                 <artifactId>maven-assembly-plugin</artifactId>
                 <version>3.7.1</version>
-                <configuration>
-                    <descriptorRefs>
-                        <descriptorRef>jar-with-dependencies</descriptorRef>
-                    </descriptorRefs>
-                    <archive>
-                        <manifest>
-                            <mainClass>org.vassalengine.tools.ModuleInspector</mainClass>
-                        </manifest>
-                    </archive>
-                    <finalName>vassal-inspector</finalName>
-                    <appendAssemblyId>false</appendAssemblyId>
-                </configuration>
                 <executions>
+                    <!-- vassal-inspector.jar -->
                     <execution>
-                        <id>make-assembly</id>
+                        <id>vassal-inspector</id>
                         <phase>package</phase>
                         <goals>
                             <goal>single</goal>
                         </goals>
+                        <configuration>
+                            <descriptorRefs>
+                                <descriptorRef>jar-with-dependencies</descriptorRef>
+                            </descriptorRefs>
+                            <archive>
+                                <manifest>
+                                    <mainClass>org.vassalengine.tools.ModuleInspector</mainClass>
+                                </manifest>
+                            </archive>
+                            <finalName>vassal-inspector</finalName>
+                            <appendAssemblyId>false</appendAssemblyId>
+                        </configuration>
+                    </execution>
+                    <!-- vmod-images.jar -->
+                    <execution>
+                        <id>vmod-images</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>single</goal>
+                        </goals>
+                        <configuration>
+                            <descriptorRefs>
+                                <descriptorRef>jar-with-dependencies</descriptorRef>
+                            </descriptorRefs>
+                            <archive>
+                                <manifest>
+                                    <mainClass>org.vassalengine.tools.VmodImages</mainClass>
+                                </manifest>
+                            </archive>
+                            <finalName>vmod-images</finalName>
+                            <appendAssemblyId>false</appendAssemblyId>
+                        </configuration>
                     </execution>
                 </executions>
             </plugin>

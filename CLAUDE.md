@@ -2,6 +2,26 @@
 
 Quick reference for understanding and working with Vassal's codebase.
 
+## Project Structure
+
+```
+vassal/
+├── pom.xml                    # Parent POM (vassal-parent)
+├── vassal-app/                # Main application module
+├── vassal-deprecation/        # Deprecation annotations
+├── vassal-tools/              # CLI utilities module
+└── mvnw                       # Maven wrapper (use this to build)
+```
+
+**Java version**: 11 (no switch expressions, no `var` in lambdas)
+
+**Build commands**:
+```bash
+./mvnw package                           # Build all
+./mvnw package -pl vassal-tools -am      # Build tools + dependencies
+./mvnw package -DskipTests               # Skip tests
+```
+
 ## File Formats
 
 ### Module Files (.vmod)
@@ -266,15 +286,31 @@ SaveMetaData.ZIP_ENTRY_NAME = "savedata"
 5. **Encoding** - Always use `StandardCharsets.UTF_8` for text
 6. **Temporary files** - ArchiveWriter creates temp files for new archives
 
-## Building Tools
+## CLI Tools (vassal-tools module)
 
-The `vassal-tools` module shows how to:
-- Create standalone CLI tools using Vassal's APIs
-- Package with all dependencies using maven-assembly-plugin
-- Parse command-line arguments
-- Output multiple formats (text, JSON)
+Located in `vassal-tools/src/main/java/org/vassalengine/tools/`:
 
-See `vassal-tools/src/main/java/org/vassalengine/tools/ModuleInspector.java` for a complete working example.
+**ModuleInspector** - Inspect module contents
+```bash
+java -jar vassal-inspector.jar module.vmod
+java -jar vassal-inspector.jar --json module.vmod
+java -jar vassal-inspector.jar --images module.vmod
+```
+
+**VmodImages** - Manage images in modules
+```bash
+java -jar vmod-images.jar list module.vmod
+java -jar vmod-images.jar add module.vmod image.png
+java -jar vmod-images.jar delete module.vmod image.png
+java -jar vmod-images.jar replace module.vmod image.png
+java -jar vmod-images.jar export module.vmod
+java -jar vmod-images.jar export --output ./dir module.vmod
+```
+
+**Adding new tools**:
+1. Create class in `vassal-tools/src/main/java/org/vassalengine/tools/`
+2. Add assembly execution in `vassal-tools/pom.xml`
+3. Use Apache Commons CLI for argument parsing, GSON for JSON output
 
 ## Quick Start for New Utilities
 
