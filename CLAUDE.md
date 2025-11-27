@@ -37,8 +37,19 @@ vassal/
   └── icons/               # UI icons
   ```
 
+### Save Files (.vsav)
+- **Format**: ZIP archive with obfuscated game state
+- **Structure**:
+  ```
+  game.vsav (ZIP)
+  ├── savedata       # Save metadata XML (version, description)
+  ├── moduledata     # Module metadata XML (name, version)
+  └── savedGame      # Obfuscated command stream (ESC-separated)
+  ```
+- **savedGame format**: Commands separated by ESC (0x1B), obfuscated via XOR
+- **Use vsav-exporter**: CLI tool for export/import to JSON (see CLI Tools section)
+
 ### Other File Types
-- **.vsav** - Saved games (ZIP with savedata + game state)
 - **.vext** - Module extensions (same structure as .vmod)
 - **.vlog** - Game replay logs
 
@@ -305,6 +316,90 @@ java -jar vmod-images.jar delete module.vmod image.png
 java -jar vmod-images.jar replace module.vmod image.png
 java -jar vmod-images.jar export module.vmod
 java -jar vmod-images.jar export --output ./dir module.vmod
+```
+
+**VsavExporter** - Export/import saved games to/from JSON
+```bash
+# Export to JSON
+java -jar vsav-exporter.jar export -o game.json game.vsav
+
+# Export to text (human-readable)
+java -jar vsav-exporter.jar export -t game.vsav
+
+# Import JSON back to .vsav
+java -jar vsav-exporter.jar import -o new.vsav game.json
+
+# Show save file info
+java -jar vsav-exporter.jar info game.vsav
+```
+
+### VsavExporter Architecture
+
+**Key Classes** in `vassal-tools/src/main/java/org/vassalengine/tools/vsav/`:
+
+| Class | Purpose |
+|-------|---------|
+| `VsavReader` | Read .vsav → extract and deobfuscate commands |
+| `VsavWriter` | Write commands → obfuscate and create .vsav |
+| `CommandParser` | Parse command strings → CommandData objects |
+| `CommandEncoder` | Encode CommandData → command strings |
+| `TraitParser` | Parse piece type/state → TraitData list |
+
+**Data Flow**:
+```
+Export: .vsav → VsavReader → CommandParser → TraitParser → JSON
+Import: JSON → TraitParser → CommandEncoder → VsavWriter → .vsav
+```
+
+**Command Types** (16 total):
+- Piece commands: `ADD_PIECE`, `REMOVE_PIECE`, `CHANGE_PIECE`, `MOVE_PIECE`
+- Game state: `PLAYER`, `TURN`, `GLOBAL_PROPERTY`, `MUTABLE_PROPERTY`
+- Markers: `BEGIN_SAVE`, `END_SAVE`, `SETUP_STACK`
+- Other: `FLARE`, `CLOCK`, `CLOCK_CONTROL`, `PLAY_AUDIO`, `PLAYER_REMOVE`
+
+**Trait Parsers** (35+ in `vsav/traits/`):
+
+| Trait ID | Class | Description |
+|----------|-------|-------------|
+| `piece` | BasicPiece | Base piece |
+| `prototype` | UsePrototype | Prototype reference |
+| `emb2` | Embellishment | Layer images |
+| `obs` | Obscurable | Masked state |
+| `hide` | Hideable | Invisible |
+| `rotate` | FreeRotator | Rotation |
+| `PROP` | DynamicProperty | Dynamic property |
+| `macro` | TriggerAction | Trigger action |
+| `footprint` | Footprint | Movement trail |
+| ... | ... | (26+ more) |
+
+**Adding a New Trait Parser**:
+1. Create `FooParser.java` in `vsav/traits/`
+2. Extend `AbstractTraitParser`
+3. Implement `parse()` and `encode()` methods
+4. Register in `TraitParserRegistry` constructor
+
+```java
+public class FooParser extends AbstractTraitParser {
+    public static final String TRAIT_ID = "foo";
+
+    @Override
+    public String getTraitId() { return TRAIT_ID; }
+
+    @Override
+    public TraitData parse(String typeSegment, String stateSegment) {
+        TraitData trait = new TraitData(TRAIT_ID, typeSegment, stateSegment);
+        String[] parts = split(typeSegment, ';');
+        trait.setProperty("field1", getPart(parts, 1));
+        return trait;
+    }
+
+    @Override
+    public String[] encode(TraitData trait) {
+        StringBuilder type = new StringBuilder(TRAIT_ID);
+        type.append(';').append(nullToEmpty(trait.getStringProperty("field1")));
+        return new String[] { type.toString(), "" };
+    }
+}
 ```
 
 **Adding new tools**:

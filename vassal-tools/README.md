@@ -107,6 +107,221 @@ $ ./vassal-inspector.sh --json MyModule.vmod > module-info.json
 $ ./vassal-inspector.sh --detailed --output analysis.txt MyModule.vmod
 ```
 
+---
+
+### vsav-exporter
+
+A command-line tool for exporting and importing VASSAL saved games (.vsav files) to/from JSON format.
+
+#### Features
+
+- **Export to JSON**: Convert .vsav files to structured, editable JSON
+- **Import from JSON**: Create .vsav files from modified JSON
+- **Round-trip Fidelity**: Lossless export/import preserves all game state
+- **Trait Parsing**: 35+ trait types parsed into structured properties
+- **Command Parsing**: 16 command types with full field extraction
+- **Text Export**: Human-readable output for quick inspection
+
+#### Commands
+
+| Command | Description |
+|---------|-------------|
+| `export` | Export .vsav to JSON or text format |
+| `import` | Import JSON back to .vsav format |
+| `info` | Display information about a .vsav file |
+
+#### Usage
+
+```bash
+# Export to JSON (stdout)
+java -jar vassal-tools/target/vsav-exporter.jar export game.vsav
+
+# Export to JSON file
+java -jar vassal-tools/target/vsav-exporter.jar export -o game.json game.vsav
+
+# Export as human-readable text
+java -jar vassal-tools/target/vsav-exporter.jar export -t game.vsav
+
+# Import JSON back to .vsav
+java -jar vassal-tools/target/vsav-exporter.jar import -o new_game.vsav game.json
+
+# Show save file info
+java -jar vassal-tools/target/vsav-exporter.jar info game.vsav
+
+# Show info as JSON
+java -jar vassal-tools/target/vsav-exporter.jar info --json game.vsav
+```
+
+#### Command-Line Options
+
+**export command:**
+- `-h, --help` - Show help message
+- `-j, --json` - Export as JSON (default)
+- `-t, --text` - Export as human-readable text
+- `-o, --output <file>` - Output file (default: stdout)
+- `-m, --module <file>` - Module file (.vmod) for prototype expansion
+- `--raw` - Include raw command strings in output
+
+**import command:**
+- `-h, --help` - Show help message
+- `-o, --output <file>` - Output .vsav file (required)
+
+**info command:**
+- `-h, --help` - Show help message
+- `-j, --json` - Output as JSON
+- `--commands` - Show command summary
+
+#### JSON Schema
+
+The exported JSON follows this structure:
+
+```
+ExportData (root)
+├── formatVersion: string           # Schema version ("1.0")
+├── saveMetadata                    # From savedata XML entry
+│   ├── version: string
+│   └── description: string
+├── moduleMetadata                  # From moduledata XML entry
+│   ├── name: string
+│   ├── version: string
+│   ├── description: string
+│   └── vassalVersion: string
+└── commands: array                 # Game state commands
+```
+
+**Command Types:**
+
+| Type | Fields |
+|------|--------|
+| `ADD_PIECE` | piece: PieceData |
+| `REMOVE_PIECE` | pieceId |
+| `CHANGE_PIECE` | pieceId, newState, oldState |
+| `MOVE_PIECE` | pieceId, newMapId, newX, newY, newUnderId, oldMapId, oldX, oldY, oldUnderId, playerId |
+| `BEGIN_SAVE` | (marker only) |
+| `END_SAVE` | (marker only) |
+| `PLAY_AUDIO` | (audio clip) |
+| `MUTABLE_PROPERTY` | key, oldValue, newValue, containerId |
+| `GLOBAL_PROPERTY` | propertyId, newValue, containerId |
+| `TURN` | trackerId, newState |
+| `PLAYER` | playerId, playerName, side |
+| `PLAYER_REMOVE` | playerId |
+| `FLARE` | flareId, x, y |
+| `CLOCK` | who, name, elapsed, verified, ticking, restore |
+| `CLOCK_CONTROL` | showing, online |
+| `SETUP_STACK` | content |
+
+**PieceData:**
+
+```
+PieceData
+├── id: string          # Unique piece identifier
+├── type: string        # Raw type definition (tab-separated traits)
+├── state: string       # Raw state string (tab-separated trait states)
+└── traits: array       # Parsed trait data
+    └── TraitData
+        ├── traitId: string           # e.g., "piece", "label", "emb2"
+        ├── rawType: string           # Original type segment
+        ├── rawState: string          # Original state segment
+        └── properties: object        # Parsed key-value properties
+```
+
+**Supported Traits (35+):**
+
+| Trait ID | VASSAL Class | Description |
+|----------|--------------|-------------|
+| `piece` | BasicPiece | Base piece with image and name |
+| `prototype` | UsePrototype | Reference to prototype definition |
+| `mark` | Marker | Property marker |
+| `label` | Labeler | Text label |
+| `emb2` | Embellishment | Layer images |
+| `obs` | Obscurable | Masked/hidden state |
+| `hide` | Hideable | Invisible to players |
+| `propertysheet` | PropertySheet | Custom properties |
+| `immob` | Immobilized | Cannot move |
+| `rotate` | FreeRotator | Rotation |
+| `markmoved` | MovementMarkable | Mark when moved |
+| `report` | ReportState | Report actions |
+| `PROP` | DynamicProperty | Dynamic property |
+| `macro` | TriggerAction | Trigger actions |
+| `footprint` | Footprint | Movement trail |
+| ... | ... | (and 20+ more) |
+
+#### Example JSON Output
+
+```json
+{
+  "formatVersion": "1.0",
+  "saveMetadata": {
+    "version": "1"
+  },
+  "moduleMetadata": {
+    "name": "My Game",
+    "version": "1.0",
+    "vassalVersion": "3.7.18"
+  },
+  "commands": [
+    {
+      "commandType": "PLAYER",
+      "playerId": "abc-123",
+      "playerName": "Player 1",
+      "side": "Allied"
+    },
+    {
+      "commandType": "ADD_PIECE",
+      "piece": {
+        "id": "piece_001",
+        "traits": [
+          {
+            "traitId": "piece",
+            "properties": {
+              "imageName": "infantry.png",
+              "basicName": "1st Infantry"
+            }
+          },
+          {
+            "traitId": "prototype",
+            "properties": {
+              "prototypeName": "Infantry Unit"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}
+```
+
+#### Round-Trip Testing
+
+```bash
+# Export original save
+java -jar vassal-tools/target/vsav-exporter.jar export -o /tmp/a.json game.vsav
+
+# Import back to new save
+java -jar vassal-tools/target/vsav-exporter.jar import -o /tmp/b.vsav /tmp/a.json
+
+# Export the re-imported save
+java -jar vassal-tools/target/vsav-exporter.jar export -o /tmp/c.json /tmp/b.vsav
+
+# Compare - should show 0 differences
+diff /tmp/a.json /tmp/c.json
+```
+
+#### Modifying Save Files
+
+```bash
+# Export to JSON
+java -jar vassal-tools/target/vsav-exporter.jar export -o game.json game.vsav
+
+# Edit with jq (example: change a piece name)
+jq '(.commands[] | select(.commandType == "ADD_PIECE") | .piece.traits[] | select(.traitId == "piece") | .properties.basicName) = "New Name"' game.json > modified.json
+
+# Import modified JSON
+java -jar vassal-tools/target/vsav-exporter.jar import -o modified.vsav modified.json
+```
+
+---
+
 ## Building
 
 ### Prerequisites
@@ -127,7 +342,8 @@ From the `vassal` directory:
 ```
 
 The compiled JAR files will be created in `vassal-tools/target/`:
-- `vassal-inspector.jar` - Standalone executable with all dependencies
+- `vassal-inspector.jar` - Module inspector with all dependencies
+- `vsav-exporter.jar` - Save file exporter/importer with all dependencies
 
 ### Running Directly with Java
 
@@ -239,11 +455,22 @@ vassal/
 ├── vassal-tools/        # CLI tools (this module)
 │   ├── src/
 │   │   └── main/java/org/vassalengine/tools/
-│   │       └── ModuleInspector.java
+│   │       ├── ModuleInspector.java
+│   │       ├── VsavExporter.java
+│   │       └── vsav/           # Save file processing
+│   │           ├── VsavReader.java
+│   │           ├── VsavWriter.java
+│   │           ├── CommandParser.java
+│   │           ├── CommandEncoder.java
+│   │           ├── TraitParser.java
+│   │           ├── model/      # Data models
+│   │           ├── traits/     # 35+ trait parsers
+│   │           ├── export/     # JSON/text exporters
+│   │           └── import_/    # JSON importer
 │   ├── target/
-│   │   └── vassal-inspector.jar
+│   │   ├── vassal-inspector.jar
+│   │   └── vsav-exporter.jar
 │   ├── pom.xml
-│   ├── vassal-inspector.sh
 │   └── README.md
 └── pom.xml
 ```
@@ -271,6 +498,13 @@ For issues or questions:
 - GitHub: https://github.com/vassalengine/vassal
 
 ## Version History
+
+### 1.1.0
+- Added vsav-exporter tool for .vsav file manipulation
+- Export/import saved games to/from JSON format
+- 35+ trait parsers for structured piece data
+- 16 command types with full field extraction
+- Round-trip fidelity for lossless save modification
 
 ### 1.0.0 (Initial Release)
 - Module Inspector tool with summary, detailed, JSON, and filtered output modes
