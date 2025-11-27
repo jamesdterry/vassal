@@ -16,11 +16,22 @@ public class CommandParser {
     // Parameter separator within commands
     private static final char PARAM_SEPARATOR = '/';
 
-    // Command prefixes
+    // Command prefixes (slash-separated)
     private static final String ADD_PREFIX = "+/";
     private static final String REMOVE_PREFIX = "-/";
     private static final String CHANGE_PREFIX = "D/";
     private static final String MOVE_PREFIX = "M/";
+
+    // Command prefixes (tab-separated)
+    private static final String MUTABLE_PROPERTY_PREFIX = "MutableProperty\t";
+    private static final String GLOBAL_PROPERTY_PREFIX = "GlobalProperty\t";
+    private static final String TURN_PREFIX = "TURN";
+    private static final String PLAYER_PREFIX = "PLAYER\t";
+    private static final String PLAYER_REMOVE_PREFIX = "PYREMOVE\t";
+    private static final String FLARE_PREFIX = "FLARE\t";
+    private static final String CLOCK_PREFIX = "CLOCK\t";
+    private static final String CLOCK_CONTROL_PREFIX = "CLOCKCONTROL\t";
+    private static final String SETUP_STACK_PREFIX = "SETUP_STACK\t";
 
     // Special commands
     private static final String BEGIN_SAVE = "begin_save";
@@ -98,6 +109,52 @@ public class CommandParser {
         if (command.startsWith("!")) {
             CommandData cmd = new CommandData(CommandData.CommandType.PLAY_AUDIO, command);
             return cmd;
+        }
+
+        // MutableProperty: MutableProperty\t{key}\t{oldVal}\t{newVal}\t{containerId}
+        if (command.startsWith(MUTABLE_PROPERTY_PREFIX)) {
+            return parseMutableProperty(command);
+        }
+
+        // GlobalProperty: GlobalProperty\t{propId};{newVal};{containerId}
+        if (command.startsWith(GLOBAL_PROPERTY_PREFIX)) {
+            return parseGlobalProperty(command);
+        }
+
+        // Turn: TURN{id}\t{newState}
+        if (command.startsWith(TURN_PREFIX)) {
+            return parseTurn(command);
+        }
+
+        // Player: PLAYER\t{id}\t{name}\t{side}
+        if (command.startsWith(PLAYER_PREFIX)) {
+            return parsePlayer(command);
+        }
+
+        // PlayerRemove: PYREMOVE\t{id}
+        if (command.startsWith(PLAYER_REMOVE_PREFIX)) {
+            return parsePlayerRemove(command);
+        }
+
+        // Flare: FLARE\t{id}\t{x}\t{y}
+        if (command.startsWith(FLARE_PREFIX)) {
+            return parseFlare(command);
+        }
+
+        // ClockControl: CLOCKCONTROL\t{showing}\t{online}
+        // Must check before CLOCK since CLOCK is a prefix of CLOCKCONTROL
+        if (command.startsWith(CLOCK_CONTROL_PREFIX)) {
+            return parseClockControl(command);
+        }
+
+        // Clock: CLOCK\t{who}\t{name}\t{elapsed}\t{verified}\t{ticking}\t{restore}
+        if (command.startsWith(CLOCK_PREFIX)) {
+            return parseClock(command);
+        }
+
+        // SetupStack: SETUP_STACK\t{content}
+        if (command.startsWith(SETUP_STACK_PREFIX)) {
+            return parseSetupStack(command);
         }
 
         // Unknown command - preserve raw for round-trip
@@ -216,5 +273,163 @@ public class CommandParser {
         } catch (NumberFormatException e) {
             return 0;
         }
+    }
+
+    /**
+     * Parse long, defaulting to 0 on error.
+     */
+    private static long parseLong(String s) {
+        try {
+            return Long.parseLong(s);
+        } catch (NumberFormatException e) {
+            return 0L;
+        }
+    }
+
+    /**
+     * Parse boolean from string.
+     */
+    private static boolean parseBoolean(String s) {
+        return "true".equalsIgnoreCase(s);
+    }
+
+    /**
+     * Split by tab character.
+     */
+    private static String[] splitByTab(String s) {
+        return s.split("\t", -1);
+    }
+
+    /**
+     * Parse MutableProperty command: MutableProperty\t{key}\t{oldVal}\t{newVal}\t{containerId}
+     */
+    private static MutablePropertyCommand parseMutableProperty(String command) {
+        String content = command.substring(MUTABLE_PROPERTY_PREFIX.length());
+        String[] parts = splitByTab(content);
+
+        MutablePropertyCommand cmd = new MutablePropertyCommand(command);
+        if (parts.length > 0) cmd.setKey(parts[0]);
+        if (parts.length > 1) cmd.setOldValue(parts[1]);
+        if (parts.length > 2) cmd.setNewValue(parts[2]);
+        if (parts.length > 3) cmd.setContainerId(parts[3]);
+
+        return cmd;
+    }
+
+    /**
+     * Parse GlobalProperty command: GlobalProperty\t{propId};{newVal};{containerId}
+     * Note: Uses semicolons within the tab-separated content.
+     */
+    private static GlobalPropertyCommand parseGlobalProperty(String command) {
+        String content = command.substring(GLOBAL_PROPERTY_PREFIX.length());
+        String[] parts = content.split(";", -1);
+
+        GlobalPropertyCommand cmd = new GlobalPropertyCommand(command);
+        if (parts.length > 0) cmd.setPropertyId(parts[0]);
+        if (parts.length > 1) cmd.setNewValue(parts[1]);
+        if (parts.length > 2) cmd.setContainerId(parts[2]);
+
+        return cmd;
+    }
+
+    /**
+     * Parse Turn command: TURN{trackerId}\t{newState}
+     */
+    private static TurnCommand parseTurn(String command) {
+        String content = command.substring(TURN_PREFIX.length());
+        String[] parts = splitByTab(content);
+
+        TurnCommand cmd = new TurnCommand(command);
+        if (parts.length > 0) cmd.setTrackerId(parts[0]);
+        if (parts.length > 1) cmd.setNewState(parts[1]);
+
+        return cmd;
+    }
+
+    /**
+     * Parse Player command: PLAYER\t{playerId}\t{playerName}\t{side}
+     */
+    private static PlayerCommand parsePlayer(String command) {
+        String content = command.substring(PLAYER_PREFIX.length());
+        String[] parts = splitByTab(content);
+
+        PlayerCommand cmd = new PlayerCommand(command);
+        if (parts.length > 0) cmd.setPlayerId(parts[0]);
+        if (parts.length > 1) cmd.setPlayerName(parts[1]);
+        if (parts.length > 2) cmd.setSide(parts[2]);
+
+        return cmd;
+    }
+
+    /**
+     * Parse PlayerRemove command: PYREMOVE\t{playerId}
+     */
+    private static PlayerRemoveCommand parsePlayerRemove(String command) {
+        String content = command.substring(PLAYER_REMOVE_PREFIX.length());
+        String[] parts = splitByTab(content);
+
+        PlayerRemoveCommand cmd = new PlayerRemoveCommand(command);
+        if (parts.length > 0) cmd.setPlayerId(parts[0]);
+
+        return cmd;
+    }
+
+    /**
+     * Parse Flare command: FLARE\t{flareId}\t{x}\t{y}
+     */
+    private static FlareCommand parseFlare(String command) {
+        String content = command.substring(FLARE_PREFIX.length());
+        String[] parts = splitByTab(content);
+
+        FlareCommand cmd = new FlareCommand(command);
+        if (parts.length > 0) cmd.setFlareId(parts[0]);
+        if (parts.length > 1) cmd.setX(parseInt(parts[1]));
+        if (parts.length > 2) cmd.setY(parseInt(parts[2]));
+
+        return cmd;
+    }
+
+    /**
+     * Parse Clock command: CLOCK\t{who}\t{name}\t{elapsed}\t{verified}\t{ticking}\t{restore}
+     */
+    private static ClockCommand parseClock(String command) {
+        String content = command.substring(CLOCK_PREFIX.length());
+        String[] parts = splitByTab(content);
+
+        ClockCommand cmd = new ClockCommand(command);
+        if (parts.length > 0) cmd.setWho(parts[0]);
+        if (parts.length > 1) cmd.setName(parts[1]);
+        if (parts.length > 2) cmd.setElapsed(parseLong(parts[2]));
+        if (parts.length > 3) cmd.setVerified(parseLong(parts[3]));
+        if (parts.length > 4) cmd.setTicking(parseBoolean(parts[4]));
+        if (parts.length > 5) cmd.setRestore(parseBoolean(parts[5]));
+
+        return cmd;
+    }
+
+    /**
+     * Parse ClockControl command: CLOCKCONTROL\t{showing}\t{online}
+     */
+    private static ClockControlCommand parseClockControl(String command) {
+        String content = command.substring(CLOCK_CONTROL_PREFIX.length());
+        String[] parts = splitByTab(content);
+
+        ClockControlCommand cmd = new ClockControlCommand(command);
+        if (parts.length > 0) cmd.setShowing(parseBoolean(parts[0]));
+        if (parts.length > 1) cmd.setOnline(parseBoolean(parts[1]));
+
+        return cmd;
+    }
+
+    /**
+     * Parse SetupStack command: SETUP_STACK\t{content}
+     */
+    private static SetupStackCommand parseSetupStack(String command) {
+        String content = command.substring(SETUP_STACK_PREFIX.length());
+
+        SetupStackCommand cmd = new SetupStackCommand(command);
+        cmd.setContent(content);
+
+        return cmd;
     }
 }

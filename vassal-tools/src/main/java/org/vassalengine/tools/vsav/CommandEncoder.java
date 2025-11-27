@@ -15,11 +15,22 @@ public class CommandEncoder {
     // Parameter separator within commands
     private static final char PARAM_SEPARATOR = '/';
 
-    // Command prefixes
+    // Command prefixes (slash-separated)
     private static final String ADD_PREFIX = "+/";
     private static final String REMOVE_PREFIX = "-/";
     private static final String CHANGE_PREFIX = "D/";
     private static final String MOVE_PREFIX = "M/";
+
+    // Command prefixes (tab-separated)
+    private static final String MUTABLE_PROPERTY_PREFIX = "MutableProperty\t";
+    private static final String GLOBAL_PROPERTY_PREFIX = "GlobalProperty\t";
+    private static final String TURN_PREFIX = "TURN";
+    private static final String PLAYER_PREFIX = "PLAYER\t";
+    private static final String PLAYER_REMOVE_PREFIX = "PYREMOVE\t";
+    private static final String FLARE_PREFIX = "FLARE\t";
+    private static final String CLOCK_PREFIX = "CLOCK\t";
+    private static final String CLOCK_CONTROL_PREFIX = "CLOCKCONTROL\t";
+    private static final String SETUP_STACK_PREFIX = "SETUP_STACK\t";
 
     /**
      * Encode a list of commands into a saved game data string.
@@ -66,6 +77,51 @@ public class CommandEncoder {
                 return "begin_save";
             case END_SAVE:
                 return "end_save";
+            case MUTABLE_PROPERTY:
+                if (command.getRawCommand() != null && !command.getRawCommand().isEmpty()) {
+                    return command.getRawCommand();
+                }
+                return encodeMutableProperty((MutablePropertyCommand) command);
+            case GLOBAL_PROPERTY:
+                if (command.getRawCommand() != null && !command.getRawCommand().isEmpty()) {
+                    return command.getRawCommand();
+                }
+                return encodeGlobalProperty((GlobalPropertyCommand) command);
+            case TURN:
+                if (command.getRawCommand() != null && !command.getRawCommand().isEmpty()) {
+                    return command.getRawCommand();
+                }
+                return encodeTurn((TurnCommand) command);
+            case PLAYER:
+                if (command.getRawCommand() != null && !command.getRawCommand().isEmpty()) {
+                    return command.getRawCommand();
+                }
+                return encodePlayer((PlayerCommand) command);
+            case PLAYER_REMOVE:
+                if (command.getRawCommand() != null && !command.getRawCommand().isEmpty()) {
+                    return command.getRawCommand();
+                }
+                return encodePlayerRemove((PlayerRemoveCommand) command);
+            case FLARE:
+                if (command.getRawCommand() != null && !command.getRawCommand().isEmpty()) {
+                    return command.getRawCommand();
+                }
+                return encodeFlare((FlareCommand) command);
+            case CLOCK:
+                if (command.getRawCommand() != null && !command.getRawCommand().isEmpty()) {
+                    return command.getRawCommand();
+                }
+                return encodeClock((ClockCommand) command);
+            case CLOCK_CONTROL:
+                if (command.getRawCommand() != null && !command.getRawCommand().isEmpty()) {
+                    return command.getRawCommand();
+                }
+                return encodeClockControl((ClockControlCommand) command);
+            case SETUP_STACK:
+                if (command.getRawCommand() != null && !command.getRawCommand().isEmpty()) {
+                    return command.getRawCommand();
+                }
+                return encodeSetupStack((SetupStackCommand) command);
             case PLAY_AUDIO:
             case UNKNOWN:
             default:
@@ -158,5 +214,134 @@ public class CommandEncoder {
      */
     private static String wrapNull(String s) {
         return s == null ? "null" : s;
+    }
+
+    /**
+     * Null-safe string - returns empty string if null.
+     */
+    private static String nullToEmpty(String s) {
+        return s == null ? "" : s;
+    }
+
+    /**
+     * Encode MutableProperty command: MutableProperty\t{key}\t{oldVal}\t{newVal}\t{containerId}
+     */
+    private static String encodeMutableProperty(MutablePropertyCommand cmd) {
+        StringBuilder sb = new StringBuilder();
+        sb.append(MUTABLE_PROPERTY_PREFIX);
+        sb.append(nullToEmpty(cmd.getKey()));
+        sb.append('\t');
+        sb.append(nullToEmpty(cmd.getOldValue()));
+        sb.append('\t');
+        sb.append(nullToEmpty(cmd.getNewValue()));
+        sb.append('\t');
+        sb.append(nullToEmpty(cmd.getContainerId()));
+        return sb.toString();
+    }
+
+    /**
+     * Encode GlobalProperty command: GlobalProperty\t{propId};{newVal};{containerId}
+     */
+    private static String encodeGlobalProperty(GlobalPropertyCommand cmd) {
+        StringBuilder sb = new StringBuilder();
+        sb.append(GLOBAL_PROPERTY_PREFIX);
+        sb.append(nullToEmpty(cmd.getPropertyId()));
+        sb.append(';');
+        sb.append(nullToEmpty(cmd.getNewValue()));
+        sb.append(';');
+        sb.append(nullToEmpty(cmd.getContainerId()));
+        return sb.toString();
+    }
+
+    /**
+     * Encode Turn command: TURN{trackerId}\t{newState}
+     */
+    private static String encodeTurn(TurnCommand cmd) {
+        StringBuilder sb = new StringBuilder();
+        sb.append(TURN_PREFIX);
+        sb.append(nullToEmpty(cmd.getTrackerId()));
+        sb.append('\t');
+        sb.append(nullToEmpty(cmd.getNewState()));
+        return sb.toString();
+    }
+
+    /**
+     * Encode Player command: PLAYER\t{playerId}\t{playerName}\t{side}
+     */
+    private static String encodePlayer(PlayerCommand cmd) {
+        StringBuilder sb = new StringBuilder();
+        sb.append(PLAYER_PREFIX);
+        sb.append(nullToEmpty(cmd.getPlayerId()));
+        sb.append('\t');
+        sb.append(nullToEmpty(cmd.getPlayerName()));
+        sb.append('\t');
+        sb.append(nullToEmpty(cmd.getSide()));
+        return sb.toString();
+    }
+
+    /**
+     * Encode PlayerRemove command: PYREMOVE\t{playerId}
+     */
+    private static String encodePlayerRemove(PlayerRemoveCommand cmd) {
+        StringBuilder sb = new StringBuilder();
+        sb.append(PLAYER_REMOVE_PREFIX);
+        sb.append(nullToEmpty(cmd.getPlayerId()));
+        return sb.toString();
+    }
+
+    /**
+     * Encode Flare command: FLARE\t{flareId}\t{x}\t{y}
+     */
+    private static String encodeFlare(FlareCommand cmd) {
+        StringBuilder sb = new StringBuilder();
+        sb.append(FLARE_PREFIX);
+        sb.append(nullToEmpty(cmd.getFlareId()));
+        sb.append('\t');
+        sb.append(cmd.getX());
+        sb.append('\t');
+        sb.append(cmd.getY());
+        return sb.toString();
+    }
+
+    /**
+     * Encode Clock command: CLOCK\t{who}\t{name}\t{elapsed}\t{verified}\t{ticking}\t{restore}
+     */
+    private static String encodeClock(ClockCommand cmd) {
+        StringBuilder sb = new StringBuilder();
+        sb.append(CLOCK_PREFIX);
+        sb.append(nullToEmpty(cmd.getWho()));
+        sb.append('\t');
+        sb.append(nullToEmpty(cmd.getName()));
+        sb.append('\t');
+        sb.append(cmd.getElapsed());
+        sb.append('\t');
+        sb.append(cmd.getVerified());
+        sb.append('\t');
+        sb.append(cmd.isTicking());
+        sb.append('\t');
+        sb.append(cmd.isRestore());
+        return sb.toString();
+    }
+
+    /**
+     * Encode ClockControl command: CLOCKCONTROL\t{showing}\t{online}
+     */
+    private static String encodeClockControl(ClockControlCommand cmd) {
+        StringBuilder sb = new StringBuilder();
+        sb.append(CLOCK_CONTROL_PREFIX);
+        sb.append(cmd.isShowing());
+        sb.append('\t');
+        sb.append(cmd.isOnline());
+        return sb.toString();
+    }
+
+    /**
+     * Encode SetupStack command: SETUP_STACK\t{content}
+     */
+    private static String encodeSetupStack(SetupStackCommand cmd) {
+        StringBuilder sb = new StringBuilder();
+        sb.append(SETUP_STACK_PREFIX);
+        sb.append(nullToEmpty(cmd.getContent()));
+        return sb.toString();
     }
 }
