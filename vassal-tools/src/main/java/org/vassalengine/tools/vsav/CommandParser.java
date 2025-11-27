@@ -106,24 +106,24 @@ public class CommandParser {
 
     /**
      * Parse AddPiece command: +/{id}/{type}/{state}
+     *
+     * Uses SequenceEncoder.Decoder to properly handle escaped / characters.
+     * VASSAL's format escapes / characters within id, type, and state using backslash.
      */
     private static AddPieceCommand parseAddPiece(String command) {
         String content = command.substring(ADD_PREFIX.length());
-        String[] parts = splitParams(content, 3);
 
-        if (parts.length < 3) {
-            // Invalid format, store as unknown
-            return new AddPieceCommand(command, new PieceData(
-                parts.length > 0 ? unwrapNull(parts[0]) : null,
-                parts.length > 1 ? parts[1] : "",
-                ""
-            ));
-        }
+        // Use SequenceEncoder.Decoder with / as separator - this properly handles escaped / characters
+        VASSAL.tools.SequenceEncoder.Decoder st = new VASSAL.tools.SequenceEncoder.Decoder(content, PARAM_SEPARATOR);
+
+        String id = st.hasMoreTokens() ? st.nextToken() : null;
+        String type = st.hasMoreTokens() ? st.nextToken() : "";
+        String state = st.hasMoreTokens() ? st.nextToken() : "";
 
         PieceData piece = new PieceData(
-            unwrapNull(parts[0]),  // id
-            parts[1],              // type
-            parts[2]               // state
+            unwrapNull(id),
+            type,
+            state
         );
 
         // Parse traits for structured access

@@ -3,6 +3,7 @@ package org.vassalengine.tools.vsav;
 import org.vassalengine.tools.vsav.model.TraitData;
 import org.vassalengine.tools.vsav.traits.AbstractTraitParser;
 import org.vassalengine.tools.vsav.traits.TraitParserRegistry;
+import VASSAL.tools.SequenceEncoder;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -28,34 +29,63 @@ public class TraitParser {
 
     /**
      * Parse piece type and state strings into a list of traits.
+     * Uses recursive parsing to handle VASSAL's nested SequenceEncoder format.
      *
-     * @param type  The type string (tab-separated trait type segments)
-     * @param state The state string (tab-separated trait state segments)
+     * VASSAL encodes pieces recursively: each trait's getType()/getState() wraps
+     * the inner piece's encoded data, escaping any embedded tabs. So we must
+     * decode recursively to get each trait's individual type/state.
+     *
+     * @param type  The type string (recursively tab-encoded trait types)
+     * @param state The state string (recursively tab-encoded trait states)
      * @return List of parsed TraitData objects, from outer to inner
      */
     public List<TraitData> parseTraits(String type, String state) {
         List<TraitData> traits = new ArrayList<>();
-
-        if (type == null || type.isEmpty()) {
-            return traits;
-        }
-
-        // Split by tabs
-        String[] typeSegments = splitByTab(type);
-        String[] stateSegments = splitByTab(state != null ? state : "");
-
-        // Parse each segment
-        for (int i = 0; i < typeSegments.length; i++) {
-            String typeSegment = typeSegments[i];
-            String stateSegment = i < stateSegments.length ? stateSegments[i] : "";
-
-            TraitData trait = parseTrait(typeSegment, stateSegment);
-            if (trait != null) {
-                traits.add(trait);
-            }
-        }
-
+        parseTraitsRecursive(type, state, traits);
         return traits;
+    }
+
+    /**
+     * Recursively parse traits from type and state strings.
+     *
+     * IMPORTANT: VASSAL's encoding is recursive - each trait's type/state is:
+     *   myType/myState TAB innerPiece.type/state
+     *
+     * The SequenceEncoder escapes any tabs in the inner data, so when we decode:
+     * - First token = this trait's own type/state
+     * - Second token = inner piece's ALREADY-DECODED type/state (with embedded tabs)
+     *
+     * We must use nextToken() to get properly decoded data, not getRemaining()
+     * which returns raw escaped data.
+     */
+    private void parseTraitsRecursive(String type, String state, List<TraitData> traits) {
+        if (type == null || type.isEmpty()) {
+            return;
+        }
+
+        // Use SequenceEncoder.Decoder to get the outer trait and inner encoded data
+        SequenceEncoder.Decoder typeDecoder = new SequenceEncoder.Decoder(type, TAB);
+        SequenceEncoder.Decoder stateDecoder = new SequenceEncoder.Decoder(state != null ? state : "", TAB);
+
+        // First token is this trait's type/state
+        String thisType = typeDecoder.hasMoreTokens() ? typeDecoder.nextToken() : "";
+        String thisState = stateDecoder.hasMoreTokens() ? stateDecoder.nextToken() : "";
+
+        // Parse this trait
+        TraitData trait = parseTrait(thisType, thisState);
+        if (trait != null) {
+            traits.add(trait);
+        }
+
+        // Second token is the inner piece's encoded type/state (already decoded by nextToken)
+        // This contains all inner traits with their proper escaping preserved
+        String innerType = typeDecoder.hasMoreTokens() ? typeDecoder.nextToken() : null;
+        String innerState = stateDecoder.hasMoreTokens() ? stateDecoder.nextToken() : null;
+
+        // Recursively parse inner traits
+        if (innerType != null && !innerType.isEmpty()) {
+            parseTraitsRecursive(innerType, innerState, traits);
+        }
     }
 
     /**
@@ -78,8 +108,9 @@ public class TraitParser {
 
     /**
      * Encode a list of traits back into type and state strings.
+     * Uses recursive encoding to match VASSAL's nested SequenceEncoder format.
      *
-     * @param traits List of TraitData objects
+     * @param traits List of TraitData objects (from outer to inner)
      * @return Two-element array: [type, state]
      */
     public String[] encodeTraits(List<TraitData> traits) {
@@ -87,51 +118,43 @@ public class TraitParser {
             return new String[] { "", "" };
         }
 
-        StringBuilder type = new StringBuilder();
-        StringBuilder state = new StringBuilder();
-
-        for (int i = 0; i < traits.size(); i++) {
-            TraitData trait = traits.get(i);
-
-            // Get the parser for this trait
-            String traitId = trait.getTraitId();
-            AbstractTraitParser parser = registry.getParser(traitId);
-
-            // Encode
-            String[] encoded = parser.encode(trait);
-
-            if (i > 0) {
-                type.append(TAB);
-                state.append(TAB);
-            }
-            type.append(encoded[0]);
-            state.append(encoded[1]);
-        }
-
-        return new String[] { type.toString(), state.toString() };
+        return encodeTraitsRecursive(traits, 0);
     }
 
     /**
-     * Split a string by tab character.
-     * Does NOT handle escape sequences - tabs in VASSAL type/state strings
-     * are literal separators.
+     * Recursively encode traits starting from the given index.
+     * Each trait wraps the inner traits' encoded data using SequenceEncoder.
      */
-    private String[] splitByTab(String s) {
-        if (s == null || s.isEmpty()) {
-            return new String[0];
+    private String[] encodeTraitsRecursive(List<TraitData> traits, int index) {
+        if (index >= traits.size()) {
+            return new String[] { "", "" };
         }
 
-        List<String> parts = new ArrayList<>();
-        int start = 0;
+        TraitData trait = traits.get(index);
 
-        for (int i = 0; i < s.length(); i++) {
-            if (s.charAt(i) == TAB) {
-                parts.add(s.substring(start, i));
-                start = i + 1;
-            }
+        // Get the parser for this trait
+        String traitId = trait.getTraitId();
+        AbstractTraitParser parser = registry.getParser(traitId);
+
+        // Encode this trait's type and state
+        String[] thisEncoded = parser.encode(trait);
+
+        // If this is the innermost trait, just return its encoding
+        if (index == traits.size() - 1) {
+            return thisEncoded;
         }
-        parts.add(s.substring(start));
 
-        return parts.toArray(new String[0]);
+        // Otherwise, recursively encode the inner traits and wrap them
+        String[] innerEncoded = encodeTraitsRecursive(traits, index + 1);
+
+        // Use SequenceEncoder to join this trait's data with inner traits' data
+        SequenceEncoder typeEncoder = new SequenceEncoder(thisEncoded[0], TAB);
+        typeEncoder.append(innerEncoded[0]);
+
+        SequenceEncoder stateEncoder = new SequenceEncoder(thisEncoded[1], TAB);
+        stateEncoder.append(innerEncoded[1]);
+
+        return new String[] { typeEncoder.getValue(), stateEncoder.getValue() };
     }
+
 }

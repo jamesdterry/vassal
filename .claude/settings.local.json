@@ -2,7 +2,12 @@
   "permissions": {
     "allow": [
       "Bash(./mvnw compile:*)",
-      "Bash(./mvnw package:*)"
+      "Bash(./mvnw package:*)",
+      "Bash(./mvnw test:*)",
+      "Bash(java -jar vassal-tools/target/vsav-exporter.jar export:*)",
+      "Bash(java -jar vassal-tools/target/vsav-exporter.jar import:*)",
+      "Bash(/Users/jamesterry/Games/vassal/test-vsav/Campaign.vsav )",
+      "Bash(/tmp/Campaign_phase3.json)"
     ],
     "deny": [],
     "ask": []

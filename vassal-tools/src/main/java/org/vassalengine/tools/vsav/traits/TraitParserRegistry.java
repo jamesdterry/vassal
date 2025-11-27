@@ -20,6 +20,30 @@ public class TraitParserRegistry {
         register(new UsePrototypeParser());
         register(new MarkerParser());
         register(new LabelerParser());
+
+        // Register High Priority traits (Phase 2)
+        register(new EmbellishmentParser());  // emb2 - Layer (modern format)
+        register(new ObscurableParser());     // obs - Mask
+        register(new HideableParser());       // hide - Invisible
+        register(new PropertySheetParser());  // propertysheet
+        register(new ImmobilizedParser());    // immob - Does Not Stack
+
+        // Register Medium Priority traits (Phase 3)
+        register(new ReportStateParser());          // report - Report Action
+        register(new MovementMarkableParser());     // markmoved - Mark When Moved
+        register(new FreeRotatorParser());          // rotate - Can Rotate
+        register(new PivotParser());                // pivot - Can Pivot
+        register(new RestrictedParser());           // restrict - Restricted Access
+        register(new DeleteParser());               // delete - Delete
+        register(new CloneParser());                // clone - Clone
+        register(new MatParser());                  // mat - Mat
+        register(new MatCargoParser());             // matPiece - Mat Cargo
+        register(new PlaceMarkerParser());          // placemark - Place Marker
+        register(new ReplaceParser());              // replace - Replace With Other
+        register(new CalculatedPropertyParser());   // calcProp - Calculated Property
+        register(new SetGlobalPropertyParser());    // setprop - Set Global Property
+        register(new SendToLocationParser());       // sendto - Send to Location
+        register(new ReturnToDeckParser());         // return - Return to Deck
     }
 
     public static TraitParserRegistry getInstance() {

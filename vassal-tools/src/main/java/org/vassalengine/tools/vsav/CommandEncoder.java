@@ -76,6 +76,8 @@ public class CommandEncoder {
 
     /**
      * Encode AddPiece command: +/{id}/{type}/{state}
+     *
+     * Uses SequenceEncoder to properly escape / characters in id, type, and state.
      */
     private static String encodeAddPiece(AddPieceCommand command) {
         PieceData piece = command.getPiece();
@@ -88,15 +90,13 @@ public class CommandEncoder {
             piece.encodeTraits();
         }
 
-        StringBuilder sb = new StringBuilder();
-        sb.append(ADD_PREFIX);
-        sb.append(wrapNull(piece.getId()));
-        sb.append(PARAM_SEPARATOR);
-        sb.append(piece.getType() != null ? piece.getType() : "");
-        sb.append(PARAM_SEPARATOR);
-        sb.append(piece.getState() != null ? piece.getState() : "");
+        // Use SequenceEncoder with / as separator - this properly escapes / characters
+        VASSAL.tools.SequenceEncoder se = new VASSAL.tools.SequenceEncoder(PARAM_SEPARATOR);
+        se.append(wrapNull(piece.getId()));
+        se.append(piece.getType() != null ? piece.getType() : "");
+        se.append(piece.getState() != null ? piece.getState() : "");
 
-        return sb.toString();
+        return ADD_PREFIX + se.getValue();
     }
 
     /**

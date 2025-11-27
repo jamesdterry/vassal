@@ -89,4 +89,60 @@ public class TraitData {
         }
         return null;
     }
+
+    /**
+     * Get an integer property with a default value.
+     */
+    public int getIntProperty(String key, int defaultValue) {
+        Integer val = getIntProperty(key);
+        return val != null ? val : defaultValue;
+    }
+
+    /**
+     * Get a double property.
+     */
+    public Double getDoubleProperty(String key) {
+        Object val = properties.get(key);
+        if (val instanceof Number) {
+            return ((Number) val).doubleValue();
+        }
+        if (val instanceof String) {
+            try {
+                return Double.parseDouble((String) val);
+            } catch (NumberFormatException e) {
+                return null;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Get a double property with a default value.
+     */
+    public double getDoubleProperty(String key, double defaultValue) {
+        Double val = getDoubleProperty(key);
+        return val != null ? val : defaultValue;
+    }
+
+    /**
+     * Get a boolean property.
+     */
+    public Boolean getBooleanProperty(String key) {
+        Object val = properties.get(key);
+        if (val instanceof Boolean) {
+            return (Boolean) val;
+        }
+        if (val instanceof String) {
+            return Boolean.parseBoolean((String) val);
+        }
+        return null;
+    }
+
+    /**
+     * Get a boolean property with a default value.
+     */
+    public boolean getBooleanProperty(String key, boolean defaultValue) {
+        Boolean val = getBooleanProperty(key);
+        return val != null ? val : defaultValue;
+    }
 }
