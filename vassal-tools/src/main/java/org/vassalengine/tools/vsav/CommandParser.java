@@ -126,6 +126,9 @@ public class CommandParser {
             parts[2]               // state
         );
 
+        // Parse traits for structured access
+        piece.parseTraits();
+
         return new AddPieceCommand(command, piece);
     }
 

@@ -39,23 +39,28 @@ public class CommandEncoder {
 
     /**
      * Encode a single command back to its string form.
-     * For Phase 0, we primarily use the raw command string for round-trip fidelity.
+     * For ADD_PIECE, we always encode from piece data so trait modifications take effect.
+     * For other commands, we use rawCommand if available for round-trip fidelity.
      */
     public static String encodeCommand(CommandData command) {
-        // If we have a raw command, use it for round-trip fidelity
-        if (command.getRawCommand() != null && !command.getRawCommand().isEmpty()) {
-            return command.getRawCommand();
-        }
-
-        // Otherwise, reconstruct from parsed data
         switch (command.getType()) {
             case ADD_PIECE:
+                // Always encode from piece data so trait modifications take effect
                 return encodeAddPiece((AddPieceCommand) command);
             case REMOVE_PIECE:
+                if (command.getRawCommand() != null && !command.getRawCommand().isEmpty()) {
+                    return command.getRawCommand();
+                }
                 return encodeRemovePiece((RemovePieceCommand) command);
             case CHANGE_PIECE:
+                if (command.getRawCommand() != null && !command.getRawCommand().isEmpty()) {
+                    return command.getRawCommand();
+                }
                 return encodeChangePiece((ChangePieceCommand) command);
             case MOVE_PIECE:
+                if (command.getRawCommand() != null && !command.getRawCommand().isEmpty()) {
+                    return command.getRawCommand();
+                }
                 return encodeMovePiece((MovePieceCommand) command);
             case BEGIN_SAVE:
                 return "begin_save";
@@ -76,6 +81,11 @@ public class CommandEncoder {
         PieceData piece = command.getPiece();
         if (piece == null) {
             return command.getRawCommand();
+        }
+
+        // If traits have been modified, encode them back to type/state strings
+        if (piece.getTraits() != null && !piece.getTraits().isEmpty()) {
+            piece.encodeTraits();
         }
 
         StringBuilder sb = new StringBuilder();

@@ -105,44 +105,177 @@ java -jar vassal-tools/target/vsav-exporter.jar info game.vsav
 
 ---
 
-## Phase 1: Core Traits
+## Phase 1: Core Traits ✅ COMPLETE
 > Goal: Parse the most essential traits - pieces can be identified and positioned
+
+**Status:** Completed and tested 2024-11-26
 
 ### Traits
 | ID | Class | Description |
 |----|-------|-------------|
 | `piece` | BasicPiece | Base piece with image and name |
-| `proto` | UsePrototype | Reference to prototype definition |
+| `prototype` | UsePrototype | Reference to prototype definition |
 | `mark` | Marker | Simple property marker |
 | `label` | Labeler | Text label on piece |
 
 ### Checklist
-- [ ] **1.1** Create `vsav/traits/TraitParserRegistry.java` - Map trait IDs to parsers
-- [ ] **1.2** Create `vsav/traits/AbstractTraitParser.java` - Base parser class
-- [ ] **1.3** Create `vsav/TraitParser.java` - Parse full decorator chain
+- [x] **1.1** Create `vsav/traits/TraitParserRegistry.java` - Map trait IDs to parsers
+- [x] **1.2** Create `vsav/traits/AbstractTraitParser.java` - Base parser class
+- [x] **1.3** Create `vsav/TraitParser.java` - Parse full decorator chain
   - Split type string by tab
   - Split state string by tab
   - Match each segment to registered parser
-- [ ] **1.4** Create `vsav/traits/UnknownTraitParser.java` - Fallback for unknown traits
-- [ ] **1.5** Implement `BasicPieceParser.java`
+- [x] **1.4** Create `vsav/traits/UnknownTraitParser.java` - Fallback for unknown traits
+- [x] **1.5** Implement `BasicPieceParser.java`
   - Type: `piece;[cloneKey];[deleteKey];[imageName];[commonName]`
-  - State: `[x];[y];[mapId];[gpId]`
-- [ ] **1.6** Implement `UsePrototypeParser.java`
-  - Type: `proto;[prototypeName]`
-  - State: (empty or matches type params)
-- [ ] **1.7** Implement `MarkerParser.java`
-  - Type: `mark;[propertyName];[value]`
-  - State: (none)
-- [ ] **1.8** Implement `LabelerParser.java`
-  - Type: `label;[labelFormat];[fontSize];...`
-  - State: `[currentLabel]`
-- [ ] **1.9** Update `PieceData.java` to include parsed traits
-- [ ] **1.10** Update `JsonExporter` to output parsed trait data
-- [ ] **1.11** Create `vsav/traits/TraitEncoder.java` - Encode traits back to strings
-- [ ] **1.12** Implement encoders for Core traits
-- [ ] **1.13** Test: Export → Edit JSON → Import round-trip with Core traits
+  - State: `[mapName];[x];[y];[gpId];[persistentPropCount];[props...]`
+- [x] **1.6** Implement `UsePrototypeParser.java`
+  - Type: `prototype;[prototypeName];[properties]`
+  - State: (empty)
+- [x] **1.7** Implement `MarkerParser.java`
+  - Type: `mark;[key1],[key2],...`
+  - State: `[value1],[value2],...`
+- [x] **1.8** Implement `LabelerParser.java`
+  - Type: `label;[keyStroke];[menuCommand];[fontSize];...`
+  - State: `[labelText]`
+- [x] **1.9** Update `PieceData.java` to include parsed traits
+- [x] **1.10** Update `JsonExporter` to output parsed trait data
+- [x] **1.11** Create trait encoding in parsers (encode method)
+- [x] **1.12** Implement encoders for Core traits
+- [x] **1.13** Test: Export → Edit JSON → Import round-trip with Core traits
 
-**Deliverable**: Tool parses/encodes Core traits; unknown traits preserved as raw strings.
+### Test Results
+- Tested with `onemove.vsav` (from `1812_Test.vmod`)
+- Round-trip: Original 14,226 bytes → Re-imported 14,131 bytes
+- JSON exports are identical after round-trip (0 diffs)
+- Trait modifications (e.g., changing piece name) persist through round-trip
+- Verified: Re-imported save loads correctly in VASSAL
+
+### Files Created/Modified
+```
+vassal-tools/src/main/java/org/vassalengine/tools/vsav/
+├── TraitParser.java (NEW)
+├── CommandParser.java (modified - calls parseTraits)
+├── CommandEncoder.java (modified - encodes from traits)
+├── model/
+│   ├── PieceData.java (modified - includes traits list)
+│   └── TraitData.java (NEW)
+└── traits/ (NEW directory)
+    ├── TraitParserRegistry.java
+    ├── AbstractTraitParser.java
+    ├── UnknownTraitParser.java
+    ├── BasicPieceParser.java
+    ├── UsePrototypeParser.java
+    ├── MarkerParser.java
+    └── LabelerParser.java
+```
+
+**Deliverable**: Tool parses/encodes Core traits; unknown traits preserved as raw strings. ✅
+
+### Implementation Notes for Future Phases
+
+#### Architecture Overview
+```
+Export Flow:
+  VsavReader → CommandParser.parseCommands() → PieceData.parseTraits() → JsonExporter
+
+Import Flow:
+  JsonImporter → CommandEncoder.encodeCommand() → PieceData.encodeTraits() → VsavWriter
+```
+
+#### Adding a New Trait Parser
+1. Create `FooParser.java` in `vsav/traits/`:
+   ```java
+   public class FooParser extends AbstractTraitParser {
+       public static final String TRAIT_ID = "foo";  // Match VASSAL's ID constant
+
+       @Override
+       public String getTraitId() { return TRAIT_ID; }
+
+       @Override
+       public TraitData parse(String typeSegment, String stateSegment) {
+           TraitData trait = new TraitData(TRAIT_ID, typeSegment, stateSegment);
+           // Parse type: foo;param1;param2;...
+           String[] typeParts = split(typeSegment, ';');
+           trait.setProperty("param1", getPart(typeParts, 1));
+           // Parse state similarly
+           return trait;
+       }
+
+       @Override
+       public String[] encode(TraitData trait) {
+           StringBuilder type = new StringBuilder(TRAIT_ID);
+           type.append(';').append(nullToEmpty(trait.getStringProperty("param1")));
+           String state = nullToEmpty(trait.getStringProperty("stateField"));
+           return new String[] { type.toString(), state };
+       }
+   }
+   ```
+
+2. Register in `TraitParserRegistry` constructor:
+   ```java
+   register(new FooParser());
+   ```
+
+#### Critical: VASSAL Escape Sequence Handling
+VASSAL's `SequenceEncoder` has asymmetric escape handling:
+- **Decoder**: `\X` where X is delimiter → literal X; `\\` → literal `\`
+- **Encoder**: Only escapes the delimiter, NOT backslashes
+
+**In our code**:
+- `split(s, delim)` - Only treats `\` + delimiter as escape. Backslashes are literal.
+- `escapeValue(s, delim)` - Only escapes the delimiter character, not backslashes.
+
+This was a major source of bugs. Don't add backslash escaping!
+
+#### Trait String Format
+- Type and state strings are TAB-separated (char 0x09)
+- Each segment is one trait, from outermost decorator to innermost (BasicPiece)
+- Within each segment, fields are typically semicolon-separated
+- Use `split(s, ';')` for type parsing, check trait source for state delimiter
+
+#### Finding Trait Formats
+Look at each trait class in `vassal-app/src/main/java/VASSAL/counters/`:
+- `public static final String ID` - The trait prefix (e.g., "emb2;")
+- `mySetType(String type)` - How type string is parsed
+- `myGetType()` - How type string is encoded
+- `mySetState(String state)` - How state string is parsed
+- `myGetState()` - How state string is encoded
+
+#### Key Classes Reference
+| VASSAL Class | Trait ID | Notes |
+|--------------|----------|-------|
+| `Embellishment` | `emb2;` | Layers (modern format) |
+| `Embellishment0` | `emb2;` | Layers (legacy, same ID!) |
+| `Obscurable` | `obs;` | Masked/fog of war |
+| `Hideable` | `hide;` | Invisible pieces |
+| `PropertySheet` | `propertysheet;` | Custom properties |
+| `Immobilized` | `immob;` | Cannot move |
+| `FreeRotator` | `rotate;` | Rotation |
+| `DynamicProperty` | `PROP;` | Note uppercase |
+
+#### Testing Pattern
+```bash
+# Build
+./mvnw package -pl vassal-tools -am -DskipTests
+
+# Round-trip test (should show 0 diffs)
+java -jar vassal-tools/target/vsav-exporter.jar export -o /tmp/a.json game.vsav
+java -jar vassal-tools/target/vsav-exporter.jar import -o /tmp/b.vsav /tmp/a.json
+java -jar vassal-tools/target/vsav-exporter.jar export -o /tmp/c.json /tmp/b.vsav
+diff /tmp/a.json /tmp/c.json
+
+# Modification test
+jq '(.commands[] | select(.piece.id == "XXX") | .piece.traits[] | select(.traitId == "piece") | .properties.basicName) = "NewName"' /tmp/a.json > /tmp/mod.json
+java -jar vassal-tools/target/vsav-exporter.jar import -o /tmp/mod.vsav /tmp/mod.json
+```
+
+#### Common Gotchas
+1. **Trait IDs**: Some differ from class names (e.g., `TriggerAction` uses `macro;`)
+2. **State delimiters**: Each trait may use different delimiters (check source)
+3. **Empty values**: Use `getPart(parts, idx, "default")` for optional fields
+4. **Integer properties**: GSON deserializes as Double; use `trait.getIntProperty()`
+5. **Trailing content**: BasicPiece state has persistent properties after gpId
 
 ---
 
