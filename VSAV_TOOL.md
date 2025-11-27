@@ -545,6 +545,93 @@ vassal-tools/src/main/java/org/vassalengine/tools/vsav/traits/
 
 ---
 
+## Phase 4.5: Comprehensive Command Types ✅ COMPLETE
+> Goal: Parse all standard VASSAL command types into structured JSON
+
+**Status:** Completed and tested 2024-11-27
+
+### Background
+The initial implementation only parsed piece-related commands (ADD_PIECE, REMOVE_PIECE, CHANGE_PIECE, MOVE_PIECE). Other command types were stored as UNKNOWN with only a rawCommand string. This phase adds structured parsing for all standard VASSAL command types.
+
+### Command Types Added
+| CommandType | Format | Fields |
+|-------------|--------|--------|
+| MUTABLE_PROPERTY | `MutableProperty\t{key}\t{oldVal}\t{newVal}\t{containerId}` | key, oldValue, newValue, containerId |
+| GLOBAL_PROPERTY | `GlobalProperty\t{propId};{newVal};{containerId}` | propertyId, newValue, containerId |
+| TURN | `TURN{trackerId}\t{newState}` | trackerId, newState |
+| PLAYER | `PLAYER\t{id}\t{name}\t{side}` | playerId, playerName, side |
+| PLAYER_REMOVE | `PYREMOVE\t{id}` | playerId |
+| FLARE | `FLARE\t{id}\t{x}\t{y}` | flareId, x, y |
+| CLOCK | `CLOCK\t{who}\t{name}\t{elapsed}\t{verified}\t{ticking}\t{restore}` | who, name, elapsed, verified, ticking, restore |
+| CLOCK_CONTROL | `CLOCKCONTROL\t{showing}\t{online}` | showing, online |
+| SETUP_STACK | `SETUP_STACK\t{content}` | content |
+
+### Previously Supported Commands
+| CommandType | Format | Description |
+|-------------|--------|-------------|
+| ADD_PIECE | `+/{id}/{type}/{state}` | Add piece to game |
+| REMOVE_PIECE | `-/{id}` | Remove piece from game |
+| CHANGE_PIECE | `D/{id}/{newState}[/{oldState}]` | Change piece state |
+| MOVE_PIECE | `M/{id}/{mapId}/{x}/{y}/...` | Move piece on map |
+| BEGIN_SAVE | `begin_save` | Start of save marker |
+| END_SAVE | `end_save` | End of save marker |
+| PLAY_AUDIO | `!{clip}` | Play sound effect |
+
+### Checklist
+- [x] **4.5.1** Add 9 new enum values to CommandData.CommandType
+- [x] **4.5.2** Create model classes for each command type
+- [x] **4.5.3** Add parsing methods to CommandParser.java
+- [x] **4.5.4** Add encoding methods to CommandEncoder.java
+- [x] **4.5.5** Add serialization/deserialization to CommandDataTypeAdapter.java
+- [x] **4.5.6** Test round-trip with real .vsav files
+
+### Test Results
+- Tested with `Campaign.vsav`
+- Before: PLAYER, GLOBAL_PROPERTY, SETUP_STACK appeared as UNKNOWN
+- After: All appear with structured JSON fields
+- Round-trip fidelity maintained via rawCommand preservation
+
+### Files Created
+```
+vassal-tools/src/main/java/org/vassalengine/tools/vsav/model/
+├── MutablePropertyCommand.java   # key, oldValue, newValue, containerId
+├── GlobalPropertyCommand.java    # propertyId, newValue, containerId
+├── TurnCommand.java              # trackerId, newState
+├── PlayerCommand.java            # playerId, playerName, side
+├── PlayerRemoveCommand.java      # playerId
+├── FlareCommand.java             # flareId, x, y
+├── ClockCommand.java             # who, name, elapsed, verified, ticking, restore
+├── ClockControlCommand.java      # showing, online
+└── SetupStackCommand.java        # content
+```
+
+### Files Modified
+- `CommandData.java` - Added 9 enum values
+- `CommandParser.java` - Added prefixes and 9 parse methods
+- `CommandEncoder.java` - Added prefixes and 9 encode methods
+- `CommandDataTypeAdapter.java` - Added serialize/deserialize for all 9 types
+
+### Implementation Notes
+- **Delimiter ordering matters**: Check CLOCK_CONTROL before CLOCK since "CLOCK" is a prefix of "CLOCKCONTROL"
+- **Tab-separated commands**: Most non-piece commands use `\t` as field separator
+- **Semicolon-separated**: GlobalProperty uses `;` within its tab-separated content
+- **Round-trip fidelity**: rawCommand is always preserved for exact reproduction
+
+### JSON Example
+```json
+{
+  "commandType": "PLAYER",
+  "playerId": "2c908f8b-1234-5678-9abc-def012345678",
+  "playerName": "Player 1",
+  "side": "Allied",
+  "rawCommand": "PLAYER\t2c908f8b-1234-5678-9abc-def012345678\tPlayer 1\tAllied"
+}
+```
+
+**Deliverable**: All standard VASSAL command types parsed into structured JSON. ✅
+
+---
+
 ## Phase 5: Polish & Documentation
 > Goal: Production-ready tool
 
@@ -581,10 +668,23 @@ vassal-tools/src/main/java/org/vassalengine/tools/
     │   ├── ExportData.java
     │   ├── SaveMetadata.java
     │   ├── ModuleMetadata.java
-    │   ├── CommandData.java
+    │   ├── CommandData.java              # Base command + CommandType enum
     │   ├── PieceData.java
     │   ├── TraitData.java
-    │   └── PrototypeData.java
+    │   ├── PrototypeData.java
+    │   ├── AddPieceCommand.java          # Piece commands
+    │   ├── RemovePieceCommand.java
+    │   ├── ChangePieceCommand.java
+    │   ├── MovePieceCommand.java
+    │   ├── MutablePropertyCommand.java   # Property commands
+    │   ├── GlobalPropertyCommand.java
+    │   ├── TurnCommand.java              # Game state commands
+    │   ├── PlayerCommand.java
+    │   ├── PlayerRemoveCommand.java
+    │   ├── FlareCommand.java
+    │   ├── ClockCommand.java
+    │   ├── ClockControlCommand.java
+    │   └── SetupStackCommand.java
     ├── traits/
     │   ├── TraitParserRegistry.java
     │   ├── AbstractTraitParser.java
@@ -595,12 +695,13 @@ vassal-tools/src/main/java/org/vassalengine/tools/
     │   ├── MarkerParser.java
     │   ├── LabelerParser.java
     │   ├── EmbellishmentParser.java
-    │   ├── ... (remaining trait parsers)
+    │   ├── ... (35+ trait parsers total)
     │   └── encoders/
     │       └── ... (trait encoders)
     ├── export/
     │   ├── JsonExporter.java
-    │   └── TextExporter.java
+    │   ├── TextExporter.java
+    │   └── CommandDataTypeAdapter.java   # GSON polymorphic serialization
     └── import_/
         └── JsonImporter.java
 ```
@@ -639,15 +740,53 @@ Test files needed:
 
 ## Notes
 
-### Observed Command Types (from onemove.vsav)
-Commands seen in testing that need handling:
-- `PLAYER` - Player info commands
-- `BoardPicker` - Map board selection
-- `SETUP_STACK` - Stack setup command
-- `stack` - Stack piece type (not a trait, a basic piece type)
+### Complete Command Type Reference
+
+| CommandType | Prefix/Pattern | Separator | Status |
+|-------------|----------------|-----------|--------|
+| ADD_PIECE | `+/` | `/` (escaped) | ✅ Parsed |
+| REMOVE_PIECE | `-/` | `/` | ✅ Parsed |
+| CHANGE_PIECE | `D/` | `/` | ✅ Parsed |
+| MOVE_PIECE | `M/` | `/` | ✅ Parsed |
+| BEGIN_SAVE | `begin_save` | - | ✅ Parsed |
+| END_SAVE | `end_save` | - | ✅ Parsed |
+| PLAY_AUDIO | `!` | - | ✅ Identified |
+| MUTABLE_PROPERTY | `MutableProperty\t` | `\t` | ✅ Parsed |
+| GLOBAL_PROPERTY | `GlobalProperty\t` | `;` | ✅ Parsed |
+| TURN | `TURN` | `\t` | ✅ Parsed |
+| PLAYER | `PLAYER\t` | `\t` | ✅ Parsed |
+| PLAYER_REMOVE | `PYREMOVE\t` | `\t` | ✅ Parsed |
+| FLARE | `FLARE\t` | `\t` | ✅ Parsed |
+| CLOCK | `CLOCK\t` | `\t` | ✅ Parsed |
+| CLOCK_CONTROL | `CLOCKCONTROL\t` | `\t` | ✅ Parsed |
+| SETUP_STACK | `SETUP_STACK\t` | `\t` | ✅ Parsed |
+
+### Known UNKNOWN Commands
+Some rare/module-specific commands may still appear as UNKNOWN:
+- `CountersBoardPicker` - Board selection (module-specific)
+- Custom module commands
+
+These are preserved via rawCommand for round-trip fidelity.
 
 ### Trait Encoding Notes
 - Traits are tab-separated in type/state strings
 - Escape sequences use backslash: `\\` for literal backslash, `\t` for tab in nested contexts
 - BasicPiece is always the innermost trait
 - Decorator chain goes from outer to inner (first trait in string wraps the rest)
+
+### Command Parsing Order
+The order of prefix checks in CommandParser matters:
+1. Check CLOCK_CONTROL before CLOCK (since "CLOCK" is a prefix of "CLOCKCONTROL")
+2. Check specific prefixes before more general ones
+
+### VSAV File Structure
+```
+game.vsav (ZIP archive)
+├── savedata      # XML: save metadata (description, version)
+├── moduledata    # XML: module metadata (name, version)
+└── savedGame     # Obfuscated command stream (ESC-separated)
+```
+
+The `savedGame` entry contains commands separated by ESC (0x1B), processed through:
+- **Export**: DeobfuscatingInputStream → split by ESC → parse each command
+- **Import**: Encode commands → join with ESC → ObfuscatingOutputStream
