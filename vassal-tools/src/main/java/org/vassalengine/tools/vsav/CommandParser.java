@@ -36,6 +36,8 @@ public class CommandParser {
     // Special commands
     private static final String BEGIN_SAVE = "begin_save";
     private static final String END_SAVE = "end_save";
+    private static final String BEGIN_LOG = "begin_log";
+    private static final String END_LOG = "end_log";
 
     /**
      * Parse a full saved game data string into a list of commands.
@@ -83,6 +85,12 @@ public class CommandParser {
         }
         if (END_SAVE.equals(command)) {
             return new CommandData(CommandData.CommandType.END_SAVE, command);
+        }
+        if (BEGIN_LOG.equals(command)) {
+            return new CommandData(CommandData.CommandType.BEGIN_LOG, command);
+        }
+        if (END_LOG.equals(command)) {
+            return new CommandData(CommandData.CommandType.END_LOG, command);
         }
 
         // AddPiece: +/{id}/{type}/{state}

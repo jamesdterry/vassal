@@ -5,6 +5,7 @@ import org.vassalengine.tools.vsav.*;
 import org.vassalengine.tools.vsav.export.*;
 import org.vassalengine.tools.vsav.import_.JsonImporter;
 import org.vassalengine.tools.vsav.model.*;
+import java.util.List;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
@@ -13,17 +14,21 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 
 /**
- * Command-line tool for exporting and importing VASSAL saved games (.vsav files).
+ * Command-line tool for exporting and importing VASSAL saved games (.vsav)
+ * and game logs (.vlog).
  *
  * This tool can:
- * - Export .vsav files to JSON or human-readable text format
- * - Import JSON back to .vsav files
+ * - Export .vsav and .vlog files to JSON or human-readable text format
+ * - Import JSON back to .vsav or .vlog files
  * - Display information about saved game files
  *
  * Usage:
  *   vsav-exporter export [-j|-t] [-o output] input.vsav
+ *   vsav-exporter export [-j|-t] [-o output] input.vlog
  *   vsav-exporter import -o output.vsav input.json
+ *   vsav-exporter import -o output.vlog input.json
  *   vsav-exporter info input.vsav
+ *   vsav-exporter info input.vlog
  */
 public class VsavExporter {
 
@@ -121,9 +126,15 @@ public class VsavExporter {
             boolean jsonFormat = !cmd.hasOption("text");
             String outputPath = cmd.getOptionValue("output");
 
-            // Read the save file
-            VsavReader reader = new VsavReader();
-            ExportData data = reader.read(inputPath);
+            // Read the save/log file based on extension
+            ExportData data;
+            if (isVlogFile(inputPath)) {
+                VlogReader reader = new VlogReader();
+                data = reader.read(inputPath);
+            } else {
+                VsavReader reader = new VsavReader();
+                data = reader.read(inputPath);
+            }
 
             // Determine output
             String output;
@@ -186,9 +197,14 @@ public class VsavExporter {
             JsonImporter importer = new JsonImporter();
             ExportData data = importer.importFromFile(inputPath);
 
-            // Write the save file
-            VsavWriter writer = new VsavWriter();
-            writer.write(data, outputPath);
+            // Write the save/log file based on output extension
+            if (isVlogFile(outputPath)) {
+                VlogWriter writer = new VlogWriter();
+                writer.write(data, outputPath);
+            } else {
+                VsavWriter writer = new VsavWriter();
+                writer.write(data, outputPath);
+            }
 
             System.err.println("Imported to: " + outputPath);
             return 0;
@@ -225,9 +241,15 @@ public class VsavExporter {
             boolean jsonFormat = cmd.hasOption("json");
             boolean showCommands = cmd.hasOption("commands");
 
-            // Read the save file
-            VsavReader reader = new VsavReader();
-            ExportData data = reader.read(inputPath);
+            // Read the save/log file based on extension
+            ExportData data;
+            if (isVlogFile(inputPath)) {
+                VlogReader reader = new VlogReader();
+                data = reader.read(inputPath);
+            } else {
+                VsavReader reader = new VsavReader();
+                data = reader.read(inputPath);
+            }
 
             if (jsonFormat) {
                 // Output as JSON (just metadata)
@@ -251,17 +273,23 @@ public class VsavExporter {
                     sb.append("  },\n");
                 }
 
-                sb.append("  \"commandCount\": ").append(data.getCommands().size()).append("\n");
-                sb.append("}\n");
+                sb.append("  \"fileType\": \"").append(data.getFileType()).append("\",\n");
+                sb.append("  \"commandCount\": ").append(data.getCommands().size());
+                if (data.isVlog() && data.getLogEntries() != null) {
+                    sb.append(",\n  \"logEntryCount\": ").append(data.getLogEntries().size());
+                }
+                sb.append("\n}\n");
 
                 System.out.print(sb.toString());
             } else {
                 // Human-readable output
                 Path path = Paths.get(inputPath);
-                System.out.println("=== VASSAL Save File Info ===");
+                String headerTitle = data.isVlog() ? "=== VASSAL Log File Info ===" : "=== VASSAL Save File Info ===";
+                System.out.println(headerTitle);
                 System.out.println("File: " + path.getFileName());
                 System.out.println("Path: " + path.toAbsolutePath());
                 System.out.println("Size: " + formatBytes(Files.size(path)));
+                System.out.println("Type: " + data.getFileType());
                 System.out.println();
 
                 if (data.getModuleMetadata() != null) {
@@ -284,7 +312,8 @@ public class VsavExporter {
                 }
 
                 // Command summary
-                System.out.println("--- Commands ---");
+                String commandHeader = data.isVlog() ? "--- Initial State ---" : "--- Commands ---";
+                System.out.println(commandHeader);
                 int addCount = 0, removeCount = 0, changeCount = 0, moveCount = 0, otherCount = 0;
                 for (CommandData c : data.getCommands()) {
                     switch (c.getType()) {
@@ -301,6 +330,23 @@ public class VsavExporter {
                 System.out.println("  Change Piece: " + changeCount);
                 System.out.println("  Move Piece: " + moveCount);
                 System.out.println("  Other: " + otherCount);
+
+                // Log entries summary (for VLOG files)
+                if (data.isVlog() && data.getLogEntries() != null) {
+                    System.out.println("\n--- Log Entries ---");
+                    List<LogEntry> logEntries = data.getLogEntries();
+                    int logCount = 0, undoCount = 0;
+                    for (LogEntry entry : logEntries) {
+                        if (entry.getEntryType() == LogEntry.EntryType.LOG) {
+                            logCount++;
+                        } else if (entry.getEntryType() == LogEntry.EntryType.UNDO) {
+                            undoCount++;
+                        }
+                    }
+                    System.out.println("Total: " + logEntries.size());
+                    System.out.println("  LOG: " + logCount);
+                    System.out.println("  UNDO: " + undoCount);
+                }
 
                 if (showCommands) {
                     System.out.println("\n--- Command Details ---");
@@ -324,14 +370,14 @@ public class VsavExporter {
     }
 
     private void printUsage() {
-        System.out.println("VASSAL Save File Exporter v" + VERSION);
+        System.out.println("VASSAL Save/Log File Exporter v" + VERSION);
         System.out.println();
         System.out.println("Usage: vsav-exporter <command> [options] <file>");
         System.out.println();
         System.out.println("Commands:");
-        System.out.println("  export    Export .vsav to JSON or text format");
-        System.out.println("  import    Import JSON back to .vsav format");
-        System.out.println("  info      Display information about a .vsav file");
+        System.out.println("  export    Export .vsav/.vlog to JSON or text format");
+        System.out.println("  import    Import JSON back to .vsav/.vlog format");
+        System.out.println("  info      Display information about a .vsav/.vlog file");
         System.out.println();
         System.out.println("Use 'vsav-exporter <command> --help' for more information.");
     }
@@ -343,12 +389,15 @@ public class VsavExporter {
 
     private void printExportHelp() {
         HelpFormatter formatter = new HelpFormatter();
-        formatter.printHelp("vsav-exporter export [options] <input.vsav>",
-            "\nExport a VASSAL saved game to JSON or text format.\n\nOptions:",
+        formatter.printHelp("vsav-exporter export [options] <input.vsav|input.vlog>",
+            "\nExport a VASSAL saved game or log to JSON or text format.\n" +
+            "File type is auto-detected by extension.\n\nOptions:",
             exportOptions,
             "\nExamples:\n" +
-            "  vsav-exporter export game.vsav              # Export to JSON (stdout)\n" +
-            "  vsav-exporter export -o game.json game.vsav # Export to file\n" +
+            "  vsav-exporter export game.vsav              # Export save to JSON (stdout)\n" +
+            "  vsav-exporter export -o game.json game.vsav # Export save to file\n" +
+            "  vsav-exporter export game.vlog              # Export log to JSON (stdout)\n" +
+            "  vsav-exporter export -o log.json game.vlog  # Export log to file\n" +
             "  vsav-exporter export -t game.vsav           # Export as text\n",
             true);
     }
@@ -356,20 +405,23 @@ public class VsavExporter {
     private void printImportHelp() {
         HelpFormatter formatter = new HelpFormatter();
         formatter.printHelp("vsav-exporter import [options] <input.json>",
-            "\nImport JSON back to VASSAL saved game format.\n\nOptions:",
+            "\nImport JSON back to VASSAL saved game or log format.\n" +
+            "Output type is determined by the -o file extension.\n\nOptions:",
             importOptions,
             "\nExamples:\n" +
-            "  vsav-exporter import -o game.vsav game.json\n",
+            "  vsav-exporter import -o game.vsav game.json  # Import to save file\n" +
+            "  vsav-exporter import -o game.vlog log.json   # Import to log file\n",
             true);
     }
 
     private void printInfoHelp() {
         HelpFormatter formatter = new HelpFormatter();
-        formatter.printHelp("vsav-exporter info [options] <input.vsav>",
-            "\nDisplay information about a VASSAL saved game.\n\nOptions:",
+        formatter.printHelp("vsav-exporter info [options] <input.vsav|input.vlog>",
+            "\nDisplay information about a VASSAL saved game or log.\n\nOptions:",
             infoOptions,
             "\nExamples:\n" +
-            "  vsav-exporter info game.vsav        # Show basic info\n" +
+            "  vsav-exporter info game.vsav        # Show save file info\n" +
+            "  vsav-exporter info game.vlog        # Show log file info\n" +
             "  vsav-exporter info --json game.vsav # JSON output\n",
             true);
     }
@@ -379,6 +431,13 @@ public class VsavExporter {
         if (bytes < 1024 * 1024) return String.format("%.1f KB", bytes / 1024.0);
         if (bytes < 1024 * 1024 * 1024) return String.format("%.1f MB", bytes / (1024.0 * 1024));
         return String.format("%.1f GB", bytes / (1024.0 * 1024 * 1024));
+    }
+
+    /**
+     * Check if the file is a VLOG file based on extension.
+     */
+    private boolean isVlogFile(String path) {
+        return path.toLowerCase().endsWith(".vlog");
     }
 
     public static void main(String[] args) {

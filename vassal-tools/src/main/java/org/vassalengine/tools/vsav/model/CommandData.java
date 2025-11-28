@@ -13,6 +13,8 @@ public class CommandData {
         MOVE_PIECE,         // M/{id}/{mapId}/{x}/{y}/...
         BEGIN_SAVE,         // begin_save
         END_SAVE,           // end_save
+        BEGIN_LOG,          // begin_log (VLOG marker)
+        END_LOG,            // end_log (VLOG marker)
         PLAY_AUDIO,         // !{clip}
         // New command types for comprehensive VSAV support
         MUTABLE_PROPERTY,   // MutableProperty\t{key}\t{oldVal}\t{newVal}\t{containerId}

@@ -77,6 +77,10 @@ public class CommandEncoder {
                 return "begin_save";
             case END_SAVE:
                 return "end_save";
+            case BEGIN_LOG:
+                return "begin_log";
+            case END_LOG:
+                return "end_log";
             case MUTABLE_PROPERTY:
                 if (command.getRawCommand() != null && !command.getRawCommand().isEmpty()) {
                     return command.getRawCommand();

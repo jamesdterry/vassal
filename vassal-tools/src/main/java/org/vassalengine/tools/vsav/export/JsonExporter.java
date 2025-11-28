@@ -26,8 +26,9 @@ public class JsonExporter {
         if (prettyPrint) {
             builder.setPrettyPrinting();
         }
-        // Register type adapters for polymorphic CommandData
+        // Register type adapters for polymorphic types
         builder.registerTypeAdapter(CommandData.class, new CommandDataTypeAdapter());
+        builder.registerTypeAdapter(LogEntry.class, new LogEntryTypeAdapter());
         this.gson = builder.create();
     }
 

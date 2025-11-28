@@ -41,8 +41,17 @@ public class TextExporter {
     }
 
     private void exportToStringBuilder(ExportData data, StringBuilder sb) {
+        if (data.isVlog()) {
+            exportVlogToStringBuilder(data, sb);
+        } else {
+            exportVsavToStringBuilder(data, sb);
+        }
+    }
+
+    private void exportVsavToStringBuilder(ExportData data, StringBuilder sb) {
         sb.append("=== VASSAL Save File Export ===\n");
-        sb.append("Format Version: ").append(data.getFormatVersion()).append("\n\n");
+        sb.append("Format Version: ").append(data.getFormatVersion()).append("\n");
+        sb.append("File Type: ").append(data.getFileType()).append("\n\n");
 
         // Save metadata
         if (data.getSaveMetadata() != null) {
@@ -117,6 +126,94 @@ public class TextExporter {
         }
     }
 
+    private void exportVlogToStringBuilder(ExportData data, StringBuilder sb) {
+        sb.append("=== VASSAL Log File Export ===\n");
+        sb.append("Format Version: ").append(data.getFormatVersion()).append("\n");
+        sb.append("File Type: ").append(data.getFileType()).append("\n\n");
+
+        // Save metadata
+        if (data.getSaveMetadata() != null) {
+            sb.append("--- Save Metadata ---\n");
+            SaveMetadata meta = data.getSaveMetadata();
+            if (meta.getVersion() != null) {
+                sb.append("Version: ").append(meta.getVersion()).append("\n");
+            }
+            if (meta.getDescription() != null && !meta.getDescription().isEmpty()) {
+                sb.append("Description: ").append(meta.getDescription()).append("\n");
+            }
+            sb.append("\n");
+        }
+
+        // Module metadata
+        if (data.getModuleMetadata() != null) {
+            sb.append("--- Module Metadata ---\n");
+            ModuleMetadata meta = data.getModuleMetadata();
+            if (meta.getName() != null) {
+                sb.append("Name: ").append(meta.getName()).append("\n");
+            }
+            if (meta.getVersion() != null) {
+                sb.append("Version: ").append(meta.getVersion()).append("\n");
+            }
+            if (meta.getVassalVersion() != null) {
+                sb.append("Vassal Version: ").append(meta.getVassalVersion()).append("\n");
+            }
+            sb.append("\n");
+        }
+
+        // Initial state summary
+        sb.append("--- Initial State ---\n");
+        sb.append("Initial Commands: ").append(data.getCommands().size()).append("\n");
+        int addCount = 0;
+        for (CommandData cmd : data.getCommands()) {
+            if (cmd.getType() == CommandData.CommandType.ADD_PIECE) {
+                addCount++;
+            }
+        }
+        sb.append("  Pieces: ").append(addCount).append("\n\n");
+
+        // Log entries summary
+        sb.append("--- Log Entries ---\n");
+        java.util.List<LogEntry> logEntries = data.getLogEntries();
+        if (logEntries == null || logEntries.isEmpty()) {
+            sb.append("No log entries.\n");
+        } else {
+            int logCount = 0;
+            int undoCount = 0;
+            for (LogEntry entry : logEntries) {
+                if (entry.getEntryType() == LogEntry.EntryType.LOG) {
+                    logCount++;
+                } else if (entry.getEntryType() == LogEntry.EntryType.UNDO) {
+                    undoCount++;
+                }
+            }
+            sb.append("Total Entries: ").append(logEntries.size()).append("\n");
+            sb.append("  LOG: ").append(logCount).append("\n");
+            sb.append("  UNDO: ").append(undoCount).append("\n\n");
+
+            // Detailed log entry listing
+            sb.append("--- Log Entry Detail ---\n");
+            int index = 0;
+            for (LogEntry entry : logEntries) {
+                sb.append(String.format("[%d] ", index++));
+                formatLogEntry(entry, sb);
+                sb.append("\n");
+            }
+        }
+    }
+
+    private void formatLogEntry(LogEntry entry, StringBuilder sb) {
+        if (entry.getEntryType() == LogEntry.EntryType.UNDO) {
+            sb.append("UNDO: inProgress=").append(entry.isUndoInProgress());
+        } else if (entry.getEntryType() == LogEntry.EntryType.LOG) {
+            sb.append("LOG: ");
+            if (entry.getCommand() != null) {
+                formatCommand(entry.getCommand(), sb);
+            } else {
+                sb.append("(no command)");
+            }
+        }
+    }
+
     private void formatCommand(CommandData cmd, StringBuilder sb) {
         switch (cmd.getType()) {
             case ADD_PIECE:
@@ -137,11 +234,17 @@ public class TextExporter {
             case END_SAVE:
                 sb.append("END_SAVE");
                 break;
+            case BEGIN_LOG:
+                sb.append("BEGIN_LOG");
+                break;
+            case END_LOG:
+                sb.append("END_LOG");
+                break;
             case PLAY_AUDIO:
                 sb.append("PLAY_AUDIO: ").append(cmd.getRawCommand());
                 break;
             default:
-                sb.append("UNKNOWN: ").append(truncate(cmd.getRawCommand(), 80));
+                sb.append(cmd.getType().name()).append(": ").append(truncate(cmd.getRawCommand(), 80));
         }
     }
 

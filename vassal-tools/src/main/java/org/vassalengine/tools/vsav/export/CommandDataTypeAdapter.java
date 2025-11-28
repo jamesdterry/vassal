@@ -285,6 +285,8 @@ public class CommandDataTypeAdapter implements JsonSerializer<CommandData>, Json
 
             case BEGIN_SAVE:
             case END_SAVE:
+            case BEGIN_LOG:
+            case END_LOG:
             case PLAY_AUDIO:
             case UNKNOWN:
             default:

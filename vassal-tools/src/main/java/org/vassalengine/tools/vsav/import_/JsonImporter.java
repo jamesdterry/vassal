@@ -3,6 +3,7 @@ package org.vassalengine.tools.vsav.import_;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import org.vassalengine.tools.vsav.export.CommandDataTypeAdapter;
+import org.vassalengine.tools.vsav.export.LogEntryTypeAdapter;
 import org.vassalengine.tools.vsav.model.*;
 
 import java.io.IOException;
@@ -21,6 +22,7 @@ public class JsonImporter {
     public JsonImporter() {
         GsonBuilder builder = new GsonBuilder();
         builder.registerTypeAdapter(CommandData.class, new CommandDataTypeAdapter());
+        builder.registerTypeAdapter(LogEntry.class, new LogEntryTypeAdapter());
         this.gson = builder.create();
     }
 
