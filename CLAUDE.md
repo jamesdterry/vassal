@@ -49,9 +49,22 @@ vassal/
 - **savedGame format**: Commands separated by ESC (0x1B), obfuscated via XOR
 - **Use vsav-exporter**: CLI tool for export/import to JSON (see CLI Tools section)
 
+### Log Files (.vlog)
+- **Format**: Same ZIP structure as .vsav
+- **Structure**:
+  ```
+  game.vlog (ZIP)
+  ├── savedata       # Save metadata XML
+  ├── moduledata     # Module metadata XML
+  └── savedGame      # Obfuscated: initial state + LOG/UNDO entries
+  ```
+- **savedGame format**: Initial commands, then `begin_log`, then `LOG\t{cmd}` or `UNDO\t{flag}` entries
+- **Prefixes** (from `BasicLogger.java:81-84`):
+  - `LOG\t` - Logged command wrapper
+  - `UNDO\t` - Undo marker with boolean flag
+
 ### Other File Types
 - **.vext** - Module extensions (same structure as .vmod)
-- **.vlog** - Game replay logs
 
 ## Core Classes for File Manipulation
 
@@ -318,19 +331,22 @@ java -jar vmod-images.jar export module.vmod
 java -jar vmod-images.jar export --output ./dir module.vmod
 ```
 
-**VsavExporter** - Export/import saved games to/from JSON
+**VsavExporter** - Export/import saved games and logs to/from JSON
 ```bash
-# Export to JSON
+# Export .vsav or .vlog to JSON (auto-detected by extension)
 java -jar vsav-exporter.jar export -o game.json game.vsav
+java -jar vsav-exporter.jar export -o log.json game.vlog
 
 # Export to text (human-readable)
 java -jar vsav-exporter.jar export -t game.vsav
 
-# Import JSON back to .vsav
+# Import JSON back to .vsav or .vlog
 java -jar vsav-exporter.jar import -o new.vsav game.json
+java -jar vsav-exporter.jar import -o new.vlog log.json
 
-# Show save file info
+# Show file info
 java -jar vsav-exporter.jar info game.vsav
+java -jar vsav-exporter.jar info game.vlog
 ```
 
 ### VsavExporter Architecture
@@ -341,21 +357,31 @@ java -jar vsav-exporter.jar info game.vsav
 |-------|---------|
 | `VsavReader` | Read .vsav → extract and deobfuscate commands |
 | `VsavWriter` | Write commands → obfuscate and create .vsav |
+| `VlogReader` | Read .vlog → parse LOG/UNDO entries |
+| `VlogWriter` | Write .vlog with LOG/UNDO prefixes |
 | `CommandParser` | Parse command strings → CommandData objects |
 | `CommandEncoder` | Encode CommandData → command strings |
 | `TraitParser` | Parse piece type/state → TraitData list |
 
 **Data Flow**:
 ```
-Export: .vsav → VsavReader → CommandParser → TraitParser → JSON
-Import: JSON → TraitParser → CommandEncoder → VsavWriter → .vsav
+Export .vsav: .vsav → VsavReader → CommandParser → TraitParser → JSON
+Export .vlog: .vlog → VlogReader → CommandParser → TraitParser → JSON
+Import: JSON → TraitParser → CommandEncoder → VsavWriter/VlogWriter
 ```
 
-**Command Types** (16 total):
+**Command Types** (18 total):
 - Piece commands: `ADD_PIECE`, `REMOVE_PIECE`, `CHANGE_PIECE`, `MOVE_PIECE`
 - Game state: `PLAYER`, `TURN`, `GLOBAL_PROPERTY`, `MUTABLE_PROPERTY`
-- Markers: `BEGIN_SAVE`, `END_SAVE`, `SETUP_STACK`
+- Save markers: `BEGIN_SAVE`, `END_SAVE`, `SETUP_STACK`
+- Log markers: `BEGIN_LOG`, `END_LOG`
 - Other: `FLARE`, `CLOCK`, `CLOCK_CONTROL`, `PLAY_AUDIO`, `PLAYER_REMOVE`
+
+**Model Classes** in `vsav/model/`:
+- `ExportData` - Root container with `fileType` ("vsav" or "vlog"), commands, logEntries
+- `LogEntry` - VLOG entry wrapper with `entryType` (LOG/UNDO), nested command
+- `CommandData` - Base command class, subclassed per command type
+- `PieceData` - Piece with parsed traits
 
 **Trait Parsers** (35+ in `vsav/traits/`):
 
