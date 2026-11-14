@@ -59,6 +59,7 @@ public class VsavExporter {
         Options opts = new Options();
         opts.addOption("h", "help", false, "Show help message");
         opts.addOption("o", "output", true, "Output .vsav file (required)");
+        opts.addOption(null, "legacy", false, "Write the pre-3.8 hex format that VASSAL 3.7 can open (default: 3.8 XZ format)");
         return opts;
     }
 
@@ -198,15 +199,19 @@ public class VsavExporter {
             ExportData data = importer.importFromFile(inputPath);
 
             // Write the save/log file based on output extension
+            SavedGameFormat format = cmd.hasOption("legacy") ? SavedGameFormat.LEGACY : SavedGameFormat.XZ;
             if (isVlogFile(outputPath)) {
                 VlogWriter writer = new VlogWriter();
+                writer.setFormat(format);
                 writer.write(data, outputPath);
             } else {
                 VsavWriter writer = new VsavWriter();
+                writer.setFormat(format);
                 writer.write(data, outputPath);
             }
 
-            System.err.println("Imported to: " + outputPath);
+            System.err.println("Imported to: " + outputPath
+                + (format == SavedGameFormat.LEGACY ? " (legacy 3.7 format)" : " (VASSAL 3.8 XZ format)"));
             return 0;
 
         } catch (ParseException e) {

@@ -1,7 +1,6 @@
 package org.vassalengine.tools.vsav;
 
 import org.vassalengine.tools.vsav.model.*;
-import VASSAL.tools.io.ObfuscatingOutputStream;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
@@ -16,6 +15,14 @@ import java.util.zip.ZipOutputStream;
  * includes LOG/UNDO prefixed entries after the initial state.
  */
 public class VlogWriter {
+
+    /** Encoding of the savedGame entry; defaults to the VASSAL 3.8 (XZ) format */
+    private SavedGameFormat format = SavedGameFormat.XZ;
+
+    /** Choose the savedGame encoding (LEGACY for files VASSAL 3.7 can open) */
+    public void setFormat(SavedGameFormat format) {
+        this.format = format;
+    }
 
     private static final String SAVEDATA_ENTRY = "savedata";
     private static final String MODULEDATA_ENTRY = "moduledata";
@@ -49,7 +56,7 @@ public class VlogWriter {
                 writeModuleMetadata(zos, data.getModuleMetadata());
             }
 
-            // Write savedGame (obfuscated) - initial state + log entries
+            // Write savedGame (XZ or legacy hex) - initial state + log entries
             writeSavedGame(zos, data);
         }
     }
@@ -97,7 +104,7 @@ public class VlogWriter {
     }
 
     /**
-     * Write savedGame entry (obfuscated) with VLOG format.
+     * Write savedGame entry (XZ or legacy hex) with VLOG format.
      * Format: initial_state_commands + begin_log + LOG/UNDO entries
      */
     private void writeSavedGame(ZipOutputStream zos, ExportData data) throws IOException {
@@ -130,8 +137,8 @@ public class VlogWriter {
         ZipEntry entry = new ZipEntry(SAVEDGAME_ENTRY);
         zos.putNextEntry(entry);
 
-        // Write obfuscated data
-        try (ObfuscatingOutputStream oos = new ObfuscatingOutputStream(new NonClosingOutputStream(zos))) {
+        // Write the command log in the chosen format (XZ or legacy hex)
+        try (OutputStream oos = format.wrap(zos)) {
             oos.write(gameData.toString().getBytes(StandardCharsets.UTF_8));
         }
 
@@ -176,18 +183,4 @@ public class VlogWriter {
                 .replace("'", "&apos;");
     }
 
-    /**
-     * Wrapper to prevent closing the underlying stream when ObfuscatingOutputStream closes.
-     */
-    private static class NonClosingOutputStream extends FilterOutputStream {
-        public NonClosingOutputStream(OutputStream out) {
-            super(out);
-        }
-
-        @Override
-        public void close() throws IOException {
-            // Don't close the underlying stream
-            flush();
-        }
-    }
 }

@@ -145,6 +145,9 @@ java -jar vassal-tools/target/vsav-exporter.jar export -t game.vsav
 # Import JSON back to .vsav
 java -jar vassal-tools/target/vsav-exporter.jar import -o new_game.vsav game.json
 
+# Import as a save VASSAL 3.7 can open (default is the 3.8 XZ format)
+java -jar vassal-tools/target/vsav-exporter.jar import --legacy -o new_game.vsav game.json
+
 # Show save file info
 java -jar vassal-tools/target/vsav-exporter.jar info game.vsav
 

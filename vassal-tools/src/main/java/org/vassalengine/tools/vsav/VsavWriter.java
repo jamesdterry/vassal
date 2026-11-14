@@ -1,7 +1,6 @@
 package org.vassalengine.tools.vsav;
 
 import org.vassalengine.tools.vsav.model.*;
-import VASSAL.tools.io.ObfuscatingOutputStream;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
@@ -12,6 +11,14 @@ import java.util.zip.ZipOutputStream;
  * Writes ExportData back to a .vsav (saved game) file.
  */
 public class VsavWriter {
+
+    /** Encoding of the savedGame entry; defaults to the VASSAL 3.8 (XZ) format */
+    private SavedGameFormat format = SavedGameFormat.XZ;
+
+    /** Choose the savedGame encoding (LEGACY for files VASSAL 3.7 can open) */
+    public void setFormat(SavedGameFormat format) {
+        this.format = format;
+    }
 
     private static final String SAVEDATA_ENTRY = "savedata";
     private static final String MODULEDATA_ENTRY = "moduledata";
@@ -38,7 +45,7 @@ public class VsavWriter {
                 writeModuleMetadata(zos, data.getModuleMetadata());
             }
 
-            // Write savedGame (obfuscated)
+            // Write savedGame (XZ or legacy hex)
             writeSavedGame(zos, data.getCommands());
         }
     }
@@ -86,7 +93,7 @@ public class VsavWriter {
     }
 
     /**
-     * Write savedGame entry (obfuscated).
+     * Write savedGame entry (XZ or legacy hex).
      */
     private void writeSavedGame(ZipOutputStream zos, java.util.List<CommandData> commands) throws IOException {
         // Encode commands to string
@@ -96,8 +103,8 @@ public class VsavWriter {
         ZipEntry entry = new ZipEntry(SAVEDGAME_ENTRY);
         zos.putNextEntry(entry);
 
-        // Write obfuscated data
-        try (ObfuscatingOutputStream oos = new ObfuscatingOutputStream(new NonClosingOutputStream(zos))) {
+        // Write the command log in the chosen format (XZ or legacy hex)
+        try (OutputStream oos = format.wrap(zos)) {
             oos.write(gameData.getBytes(StandardCharsets.UTF_8));
         }
 
@@ -118,18 +125,4 @@ public class VsavWriter {
                 .replace("'", "&apos;");
     }
 
-    /**
-     * Wrapper to prevent closing the underlying stream when ObfuscatingOutputStream closes.
-     */
-    private static class NonClosingOutputStream extends FilterOutputStream {
-        public NonClosingOutputStream(OutputStream out) {
-            super(out);
-        }
-
-        @Override
-        public void close() throws IOException {
-            // Don't close the underlying stream
-            flush();
-        }
-    }
 }

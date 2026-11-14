@@ -47,6 +47,7 @@ vassal/
   └── savedGame      # Obfuscated command stream (ESC-separated)
   ```
 - **savedGame format**: Commands separated by ESC (0x1B), obfuscated via XOR
+- **savedGame encoding** (changed in 3.8.0, #15121): VASSAL 3.8+ writes the entry XZ-compressed (magic `FD 37 7A 58 5A 00`, LZMA2 preset 3, `GameState.compressSavedGame`); 3.7 and earlier wrote `!VCSK` + hex key + hex(byte XOR key). `DeobfuscatingInputStream` reads both. 3.7 cannot open XZ saves. The vsav tools write XZ by default; `import --legacy` writes the hex format (`vsav/SavedGameFormat.java` keeps a port of the old writer, since 3.8.0's `ObfuscatingOutputStream` is deprecated and now just writes XZ)
 - **Use vsav-exporter**: CLI tool for export/import to JSON (see CLI Tools section)
 
 ### Log Files (.vlog)
@@ -356,7 +357,7 @@ java -jar vsav-exporter.jar info game.vlog
 | Class | Purpose |
 |-------|---------|
 | `VsavReader` | Read .vsav → extract and deobfuscate commands |
-| `VsavWriter` | Write commands → obfuscate and create .vsav |
+| `VsavWriter` | Write commands → encode (XZ, or legacy hex) and create .vsav |
 | `VlogReader` | Read .vlog → parse LOG/UNDO entries |
 | `VlogWriter` | Write .vlog with LOG/UNDO prefixes |
 | `CommandParser` | Parse command strings → CommandData objects |

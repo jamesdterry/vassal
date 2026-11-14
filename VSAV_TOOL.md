@@ -21,7 +21,7 @@ This document serves as a checklist for implementing the VsavExporter tool in ph
 - [x] **0.3** Create `vsav/VsavWriter.java` - Write .vsav ZIP structure
   - Write `savedata` XML
   - Write `moduledata` XML
-  - Write `savedGame` via ObfuscatingOutputStream
+  - Write `savedGame` via `SavedGameFormat` (XZ as in VASSAL 3.8; `--legacy` for the 3.7 hex format)
   - Join commands with COMMAND_SEPARATOR
 - [x] **0.4** Create `vsav/ModuleDefinitionReader.java` - Read .vmod buildFile.xml
   - Extract prototype definitions
@@ -716,7 +716,7 @@ vassal-tools/src/main/java/org/vassalengine/tools/
 | `vassal-app/.../BasicCommandEncoder.java:337-394` | Command parsing patterns |
 | `vassal-app/.../SequenceEncoder.java` | Parsing utility |
 | `vassal-app/.../DeobfuscatingInputStream.java` | Deobfuscation |
-| `vassal-app/.../ObfuscatingOutputStream.java` | Obfuscation for import |
+| `vassal-app/.../GameState.java` (`compressSavedGame`) | XZ encoding for import (3.8+) |
 | `vassal-app/.../counters/*.java` | Each trait's myGetType/myGetState |
 | `vassal-tools/.../ModuleInspector.java` | CLI patterns |
 
